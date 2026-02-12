@@ -3,7 +3,7 @@ import asyncio
 
 async def client_handler(reader,writer):
     try:
-        
+        data_store={}
         CONNECT = True
         while CONNECT:
             input_data=await reader.read(1024)
@@ -37,7 +37,24 @@ async def client_handler(reader,writer):
                     string_length=len(echo_data)
                     response=f"${string_length}\r\n{echo_data}\r\n"  
                     writer.write(response.encode())
-                    await writer.drain()          
+                    await writer.drain() 
+                elif data_list[0] == 'SET':
+                    key=data_list[1]
+                    val=data_list[2]
+                    data_store[key] = val                     
+                    response=f"+OK\r\n"  
+                    writer.write(response.encode())
+                    await writer.drain() 
+                elif data_list[0] == 'GET': 
+                    key=data_list[1]
+                    if key in data_store.keys() :
+                        val=data_store[key]
+                        val_length=len(val)
+                        response=f'${val_length}\r\n{val}\r\n'
+                    else:
+                        response=f"$-1\r\n"
+                    writer.write(response.encode())
+                    await writer.drain()                     
             
             if not CONNECT:
                 break
