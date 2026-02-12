@@ -7,7 +7,7 @@ async def client_handler(reader,writer):
         CONNECT = True
         while CONNECT:
             input_data=await reader.read(1024)
-            input_tokens=input_data.splitlines()
+            input_tokens=input_data.decode().splitlines()
             no_of_elements=int(input_tokens[0].lstrip('*'))
             i=1
             data_list=[]
