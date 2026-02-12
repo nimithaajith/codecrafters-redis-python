@@ -7,9 +7,29 @@ async def client_handler(reader,writer):
         CONNECT = True
         while CONNECT:
             input_data=await reader.read(1024)
-            response=b"+PONG\r\n"
-            writer.write(response)
-            await writer.drain()
+            input_tokens=input_data.splitlines()
+            no_of_elements=int(input_tokens[0].lstrip('*'))
+            i=1
+            data_list=[]
+            while i<no_of_elements:
+                data_list.append(input_tokens[i+1].strip())
+                i += 2
+            if no_of_elements == 1:
+                if data_list[0] == 'PING':
+                    response=b"+PONG\r\n"
+                    writer.write(response)
+                    await writer.drain()                    
+            elif no_of_elements > 1:
+                if data_list[0] == 'ECHO':
+                    if len(data_list[1:] > 1):
+                        echo_data=" ".join(data_list[1:])
+                    else:
+                        echo_data = data_list[1]
+                    string_length=len(echo_data)
+                    response=f"${string_length}\r\n{echo_data}\r\n"  
+                    writer.write(response.encode())
+                    await writer.drain()          
+            
             if not CONNECT:
                 break
                 
