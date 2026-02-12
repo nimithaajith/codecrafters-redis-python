@@ -40,7 +40,7 @@ def main():
     #     data = conn.recv(1024)
     #     conn.sendall(b"+PONG\r\n")
 
-    asyncio.run(run_server)
+    asyncio.run(run_server())
     
 
 
