@@ -10,6 +10,7 @@ async def client_handler(reader,writer):
             input_tokens=input_data.decode().splitlines()
             no_of_elements=int(input_tokens[0].lstrip('*'))
             data_list=[]
+            print('no_of_elements= ',no_of_elements)
             print(input_tokens)
             
             if no_of_elements == 1:
@@ -18,11 +19,16 @@ async def client_handler(reader,writer):
                     writer.write(response)
                     await writer.drain()                    
             elif no_of_elements > 1:
-                i=2
-                while i<no_of_elements:
-                    print(i, data_list)
-                    data_list.append(input_tokens[i].strip())
-                    i += 2
+                for token in input_tokens:
+                    if token.startswith('*') or token.startswith('$'):
+                        continue
+                    data_list.append(token.strip())
+                print('data list = ', data_list)
+                # i=2
+                # while i<no_of_elements:
+                #     print(i, data_list)
+                #     data_list.append(input_tokens[i].strip())
+                #     i += 2
                 if data_list[0] == 'ECHO':
                     if len(data_list[1:] ) > 1:
                         echo_data=" ".join(data_list[1:])
