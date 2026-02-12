@@ -9,19 +9,20 @@ async def client_handler(reader,writer):
             input_data=await reader.read(1024)
             input_tokens=input_data.decode().splitlines()
             no_of_elements=int(input_tokens[0].lstrip('*'))
-            i=2
             data_list=[]
             print(input_tokens)
-            while i<no_of_elements:
-                print(i, data_list)
-                data_list.append(input_tokens[i].strip())
-                i += 2
+            
             if no_of_elements == 1:
-                if data_list[0] == 'PING':
+                if input_tokens[2] == 'PING':
                     response=b"+PONG\r\n"
                     writer.write(response)
                     await writer.drain()                    
             elif no_of_elements > 1:
+                i=2
+                while i<no_of_elements:
+                    print(i, data_list)
+                    data_list.append(input_tokens[i].strip())
+                    i += 2
                 if data_list[0] == 'ECHO':
                     if len(data_list[1:] ) > 1:
                         echo_data=" ".join(data_list[1:])
