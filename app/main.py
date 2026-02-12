@@ -9,10 +9,10 @@ async def client_handler(reader,writer):
             input_data=await reader.read(1024)
             input_tokens=input_data.decode().splitlines()
             no_of_elements=int(input_tokens[0].lstrip('*'))
-            i=1
+            i=2
             data_list=[]
             while i<no_of_elements:
-                data_list.append(input_tokens[i+1].strip())
+                data_list.append(input_tokens[i].strip())
                 i += 2
             if no_of_elements == 1:
                 if data_list[0] == 'PING':
