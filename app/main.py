@@ -11,7 +11,9 @@ async def client_handler(reader,writer):
             no_of_elements=int(input_tokens[0].lstrip('*'))
             i=2
             data_list=[]
+            print(input_tokens)
             while i<no_of_elements:
+                print(i, data_list)
                 data_list.append(input_tokens[i].strip())
                 i += 2
             if no_of_elements == 1:
