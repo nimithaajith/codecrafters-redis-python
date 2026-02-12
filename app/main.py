@@ -21,7 +21,7 @@ async def client_handler(reader,writer):
                     await writer.drain()                    
             elif no_of_elements > 1:
                 if data_list[0] == 'ECHO':
-                    if len(data_list[1:] > 1):
+                    if len(data_list[1:] ) > 1:
                         echo_data=" ".join(data_list[1:])
                     else:
                         echo_data = data_list[1]
