@@ -59,14 +59,14 @@ async def client_handler(reader,writer):
                 elif data_list[0] == 'GET': 
                     key=data_list[1]
                     if key in data_store.keys() :
+                        val=data_store[key].data
+                        val_length=len(val)
+                        response=f'${val_length}\r\n{val}\r\n'
                         expiry=data_store[key].exp
-                        if expiry < datetime.now(timezone.utc) :
-                            response = f"$-1\r\n"
-                        else:
-                            val=data_store[key].data
-                            val_length=len(val)
-                            response=f'${val_length}\r\n{val}\r\n'                        
-
+                        if expiry :
+                            if expiry < datetime.now(timezone.utc) :
+                                response = f"$-1\r\n"                       
+                            
                     else:
                         response=f"$-1\r\n"
                     writer.write(response.encode())
