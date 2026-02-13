@@ -1,18 +1,28 @@
 import socket  # noqa: F401
 import asyncio
+from datetime import timezone,timedelta,datetime
+
+class RedisObject():
+    def __init__(self,data,exp=None,counter=0):
+        self.data = data
+        self.exp = exp
+        self.counter = counter
 
 async def client_handler(reader,writer):
     try:
         data_store={}
         CONNECT = True
         while CONNECT:
-            input_data=await reader.read(1024)
-            input_tokens=input_data.decode().splitlines()
-            no_of_elements=int(input_tokens[0].lstrip('*'))
+            input_query=await reader.read(1024)
+            if not input_query:
+                break
+            query_string=str(input_query.decode())            
+            if not query_string.startswith("*"):
+                break
+            input_tokens=query_string.splitlines()
+            no_of_elements=int(input_tokens[0].lstrip('*'))               
+
             data_list=[]
-            print('no_of_elements= ',no_of_elements)
-            print(input_tokens)
-            
             if no_of_elements == 1:
                 if input_tokens[2] == 'PING':
                     response=b"+PONG\r\n"
@@ -23,12 +33,6 @@ async def client_handler(reader,writer):
                     if token.startswith('*') or token.startswith('$'):
                         continue
                     data_list.append(token.strip())
-                print('data list = ', data_list)
-                # i=2
-                # while i<no_of_elements:
-                #     print(i, data_list)
-                #     data_list.append(input_tokens[i].strip())
-                #     i += 2
                 if data_list[0] == 'ECHO':
                     if len(data_list[1:] ) > 1:
                         echo_data=" ".join(data_list[1:])
@@ -41,16 +45,28 @@ async def client_handler(reader,writer):
                 elif data_list[0] == 'SET':
                     key=data_list[1]
                     val=data_list[2]
-                    data_store[key] = val                     
+                    expiry =None
+                    if len(data_list) > 3:
+                        if data_list[3] == 'PX':
+                            expiry = datetime.now(timezone.utc) + timedelta(milliseconds=int(data_list[4]))
+                        elif data_list[3] == 'EX' :
+                            expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))
+                        
+                    data_store[key] = RedisObject(data = val,exp=expiry) 
                     response=f"+OK\r\n"  
                     writer.write(response.encode())
                     await writer.drain() 
                 elif data_list[0] == 'GET': 
                     key=data_list[1]
                     if key in data_store.keys() :
-                        val=data_store[key]
-                        val_length=len(val)
-                        response=f'${val_length}\r\n{val}\r\n'
+                        expiry=data_store[key].exp
+                        if expiry < datetime.now(timezone.utc) :
+                            response = f"$-1\r\n"
+                        else:
+                            val=data_store[key].data
+                            val_length=len(val)
+                            response=f'${val_length}\r\n{val}\r\n'                        
+
                     else:
                         response=f"$-1\r\n"
                     writer.write(response.encode())
