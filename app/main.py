@@ -3,10 +3,22 @@ import asyncio
 from datetime import timezone,timedelta,datetime
 
 class RedisObject():
-    def __init__(self,data,exp=None,counter=0):
+    def __init__(self,data,data_type,exp=None,counter=0):
         self.data = data
         self.exp = exp
         self.counter = counter
+        self.data_type = data_type
+
+async def get_data_type(val):
+    if isinstance(val,str):
+        return 'string'
+    else:
+        None
+    
+
+
+
+
 
 async def client_handler(reader,writer):
     try:
@@ -45,6 +57,7 @@ async def client_handler(reader,writer):
                 elif data_list[0] == 'SET':
                     key=data_list[1]
                     val=data_list[2]
+                    data_type = await get_data_type(val)
                     expiry =None
                     if len(data_list) > 3:
                         if data_list[3] == 'PX':
@@ -52,7 +65,7 @@ async def client_handler(reader,writer):
                         elif data_list[3] == 'EX' :
                             expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))
                         
-                    data_store[key] = RedisObject(data = val,exp=expiry) 
+                    data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
                     response=f"+OK\r\n"  
                     writer.write(response.encode())
                     await writer.drain() 
@@ -70,7 +83,16 @@ async def client_handler(reader,writer):
                     else:
                         response=f"$-1\r\n"
                     writer.write(response.encode())
-                    await writer.drain()                     
+                    await writer.drain() 
+                elif data_list[0] == 'TYPE': 
+                    key=data_list[1]
+                    if key in data_store.keys() :
+                        data_type= data_store.get(key).data_type
+                        response=f'+{data_type}\r\n'
+                    else:
+                        response=f'+none\r\n'
+                    writer.write(response.encode())
+                    await writer.drain()                                            
             
             if not CONNECT:
                 break
