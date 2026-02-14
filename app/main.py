@@ -112,6 +112,7 @@ async def client_handler(reader,writer):
                     key=data_list[1]
                     # XADD stream_key 0-1 foo bar
                     stream_key = data_list[2]
+                    print('key =',key,' stream key =',stream_key)
                     new_stream_entry=StreamEntry(id=stream_key)
                     stream_entry_data=data_list[3:]
                     i=0
@@ -119,6 +120,7 @@ async def client_handler(reader,writer):
                     while i<len(stream_entry_data):                        
                         l.append([stream_entry_data[i],stream_entry_data[i+1]])
                         i += 2
+                    print('l =',l)
                     new_stream_entry.add_entry(l)
                     if key in data_store.keys() :
                         redis_obj=data_store.get(key)                        
@@ -126,7 +128,10 @@ async def client_handler(reader,writer):
                         data_store[key] = RedisObject(data = [],data_type='stream') 
                         redis_obj=data_store.get(key)
                     redis_obj.data.append(l)
-                    response=f'${len(stream_key)}\r\n{stream_key}\r\n'          
+                    print('redis obj data :',redis_obj.data)
+                    response=f'${len(stream_key)}\r\n{stream_key}\r\n'  
+                    writer.write(response.encode())
+                    await writer.drain()         
                 elif data_list[0] == 'TYPE': 
                     key=data_list[1]
                     if key in data_store.keys() :
