@@ -125,7 +125,8 @@ async def client_handler(reader,writer):
                     else:
                         data_store[key] = RedisObject(data = [],data_type='stream') 
                         redis_obj=data_store.get(key)
-                    redis_obj.data.append(l)           
+                    redis_obj.data.append(l)
+                    response=f'${len(stream_key)}\r\n{stream_key}\r\n'          
                 elif data_list[0] == 'TYPE': 
                     key=data_list[1]
                     if key in data_store.keys() :
