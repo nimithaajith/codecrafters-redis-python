@@ -3,11 +3,35 @@ import asyncio
 from datetime import timezone,timedelta,datetime
 
 class RedisObject():
-    def __init__(self,data,data_type,exp=None,counter=0):
+    def __init__(self,data=None,data_type=None,exp=None,counter=0):
         self.data = data
         self.exp = exp
         self.counter = counter
         self.data_type = data_type
+
+    def add_data(self,data):
+        self.data = data
+
+    def add_data_type(self,data_type):
+        self.data_type = data_type
+
+    def incr_counter(self):
+        self.counter += 1
+
+    def decr_counter(self):
+        self.counter -= 1
+
+    def add_exp(self,exp):
+        self.exp = exp
+    
+
+class StreamEntry():
+    def __init__(self,id):
+        self.id = id
+        self.entry={} 
+    def add_entry(self,data_list) :
+        for item in data_list:
+            self.entry[item[0]] = item[1]   
 
 async def get_data_type(val):
     if isinstance(val,str):
@@ -84,6 +108,24 @@ async def client_handler(reader,writer):
                         response=f"$-1\r\n"
                     writer.write(response.encode())
                     await writer.drain() 
+                elif data_list[0] == 'XADD': 
+                    key=data_list[1]
+                    # XADD stream_key 0-1 foo bar
+                    stream_key = data_list[2]
+                    new_stream_entry=StreamEntry(id=stream_key)
+                    stream_entry_data=data_list[3:]
+                    i=0
+                    l=[]
+                    while i<len(stream_entry_data):                        
+                        l.append([stream_entry_data[i],stream_entry_data[i+1]])
+                        i += 2
+                    new_stream_entry.add_entry(l)
+                    if key in data_store.keys() :
+                        redis_obj=data_store.get(key)                        
+                    else:
+                        data_store[key] = RedisObject(data = [],data_type='stream') 
+                        redis_obj=data_store.get(key)
+                    redis_obj.data.append(l)           
                 elif data_list[0] == 'TYPE': 
                     key=data_list[1]
                     if key in data_store.keys() :
@@ -92,7 +134,7 @@ async def client_handler(reader,writer):
                     else:
                         response=f'+none\r\n'
                     writer.write(response.encode())
-                    await writer.drain()                                            
+                    await writer.drain()                                           
             
             if not CONNECT:
                 break
