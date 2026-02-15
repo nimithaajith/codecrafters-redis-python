@@ -8,6 +8,7 @@ class RedisObject():
         self.exp = exp
         self.counter = counter
         self.data_type = data_type
+        self.last_key=None
 
     def add_data(self,data):
         self.data = data
@@ -30,34 +31,65 @@ class StreamEntry():
         self.id = id
         self.entry={} 
     def add_entry(self,data_list) :
+        print("******Add entry called*******")
         for item in data_list:
-            self.entry[item[0]] = item[1]   
+            self.entry[item[0]] = item[1] 
+            print("stream entry added key-val as :",item[0],item[1])
+            print("stream entry dict")  
+            print(self.entry)
+        print("******Add entry finished*******")
+
+
+async def valid_stream_key(stream_key,last_key):
+    #<millisecondsTime>-<sequenceNumber>
+    message =''
+    last_key_parts = str(last_key).split('-')
+    stream_key_parts = str(stream_key).split('-')
+    last_key_millisecondsTime = int(last_key_parts[0].strip())
+    last_key_sequenceNumber = int(last_key_parts[1].strip())
+    stream_key_millisecondsTime = int(stream_key_parts[0].strip())
+    stream_key_sequenceNumber = int(stream_key_parts[1].strip())
+    if stream_key_millisecondsTime == 0 and stream_key_sequenceNumber == 0:
+        message =f'-ERR The ID specified in XADD must be greater than 0-0\r\n'
+    elif last_key_millisecondsTime == stream_key_millisecondsTime :
+        if stream_key_sequenceNumber > last_key_sequenceNumber:
+            return True,message
+        else:
+            message=f'-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n'
+    elif stream_key_millisecondsTime >last_key_millisecondsTime:
+        return True,message
+    else:
+        message=f'-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n'
+    return False,message
+
+
+    
+        
 
 async def get_data_type(val):
     if isinstance(val,str):
         return 'string'
     else:
         None
-    
-
-
-
-
 
 async def client_handler(reader,writer):
     try:
+        print("Connected...")
         data_store={}
         CONNECT = True
         while CONNECT:
             input_query=await reader.read(1024)
+            print("Received query :",input_query)
             if not input_query:
                 break
-            query_string=str(input_query.decode())            
+            query_string=str(input_query.decode()) 
+            print("query_string :",query_string)           
             if not query_string.startswith("*"):
                 break
             input_tokens=query_string.splitlines()
+            print("input_tokens :",input_tokens) 
             no_of_elements=int(input_tokens[0].lstrip('*'))               
-
+            print("no_of_elements :",input_tokens[0], no_of_elements) 
             data_list=[]
             if no_of_elements == 1:
                 if input_tokens[2] == 'PING':
@@ -110,26 +142,51 @@ async def client_handler(reader,writer):
                     await writer.drain() 
                 elif data_list[0] == 'XADD': 
                     key=data_list[1]
-                    # XADD stream_key 0-1 foo bar
                     stream_key = data_list[2]
-                    print('key =',key,' stream key =',stream_key)
-                    new_stream_entry=StreamEntry(id=stream_key)
-                    stream_entry_data=data_list[3:]
-                    i=0
-                    l=[]
-                    while i<len(stream_entry_data):                        
-                        l.append([stream_entry_data[i],stream_entry_data[i+1]])
-                        i += 2
-                    print('l =',l)
-                    new_stream_entry.add_entry(l)
+                    print('key =',key,' stream key =',stream_key)                    
+                    # XADD stream_key 0-1 foo bar
+                    #<millisecondsTime>-<sequenceNumber>
+                    AddStream = True
                     if key in data_store.keys() :
-                        redis_obj=data_store.get(key)                        
+                        redis_obj=data_store.get(key)   
+                        last_key=redis_obj.last_key
+                        valid,message = await valid_stream_key(stream_key,last_key)
+                        if valid:
+                            redis_obj.last_key = stream_key 
+                        else:
+                            AddStream = False
+
                     else:
-                        data_store[key] = RedisObject(data = [],data_type='stream') 
-                        redis_obj=data_store.get(key)
-                    redis_obj.data.append(l)
-                    print('redis obj data :',redis_obj.data)
-                    response=f'${len(stream_key)}\r\n{stream_key}\r\n'  
+                        stream_key_parts = str(stream_key).split('-')
+                        stream_key_millisecondsTime = int(stream_key_parts[0].strip())
+                        stream_key_sequenceNumber = int(stream_key_parts[1].strip())
+                        if stream_key_millisecondsTime == 0 and stream_key_sequenceNumber == 0:
+                            message =f'-ERR The ID specified in XADD must be greater than 0-0\r\n'
+                            AddStream = False
+                        else:
+                            data_store[key] = RedisObject(data = [],data_type='stream') 
+                            redis_obj=data_store.get(key)
+                            redis_obj.last_key=stream_key
+                    if AddStream :
+                        new_stream_entry=StreamEntry(id=stream_key)
+                        stream_entry_data=data_list[3:]
+                        i=0
+                        l=[]
+                        while i<len(stream_entry_data):                        
+                            l.append([stream_entry_data[i],stream_entry_data[i+1]])
+                            i += 2
+                        print('l =',l)
+                        print('new_stream_entry =',new_stream_entry.id, new_stream_entry.entry)
+                        new_stream_entry.add_entry(l)
+                        print('new_stream_entry =',new_stream_entry.id, new_stream_entry.entry)
+                    
+                    
+                        redis_obj.data.append(new_stream_entry)
+                        print('redis obj data')
+                        print(redis_obj.data)
+                        response=f'${len(stream_key)}\r\n{stream_key}\r\n'  
+                    else:
+                        response = message
                     writer.write(response.encode())
                     await writer.drain()         
                 elif data_list[0] == 'TYPE': 
