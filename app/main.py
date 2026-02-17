@@ -40,14 +40,31 @@ class StreamEntry():
         print("******Add entry finished*******")
 
 
+def get_stream_key(millisecondstime,stream_obj_list):   
+    keydict={}
+    last_sn=-1
+    for obj in stream_obj_list:
+        mst,sn=([int(part.strip()) for part in str(obj.id).split('-')])
+        if millisecondstime == mst:
+            if last_sn < sn:
+                last_sn=sn
+    if millisecondstime == 0 and last_sn == -1:
+        last_sn = 0
+    print(">>>Last sequence no: ",last_sn)
+
+    return str(millisecondstime)+'-'+str(last_sn+1)
+        
+
+
+
 async def valid_stream_key(stream_key,last_key):
     #<millisecondsTime>-<sequenceNumber>
     message =''
-    last_key_parts = str(last_key).split('-')
     stream_key_parts = str(stream_key).split('-')
+    stream_key_millisecondsTime = int(stream_key_parts[0].strip())    
+    last_key_parts = str(last_key).split('-')
     last_key_millisecondsTime = int(last_key_parts[0].strip())
     last_key_sequenceNumber = int(last_key_parts[1].strip())
-    stream_key_millisecondsTime = int(stream_key_parts[0].strip())
     stream_key_sequenceNumber = int(stream_key_parts[1].strip())
     if stream_key_millisecondsTime == 0 and stream_key_sequenceNumber == 0:
         message =f'-ERR The ID specified in XADD must be greater than 0-0\r\n'
@@ -62,6 +79,20 @@ async def valid_stream_key(stream_key,last_key):
         message=f'-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n'
     return False,message
 
+
+async def get_new_stream_key(stream_key_part1,redis_obj):
+    stream_key_millisecondsTime =int(stream_key_part1)
+    if not redis_obj.data or not redis_obj.last_key:
+        if stream_key_millisecondsTime == 0:
+            stream_key = '0-1' 
+        else:
+            stream_key=stream_key_part1 + '-1'
+        
+    else:
+        stream_key = get_stream_key(stream_key_millisecondsTime,redis_obj.data)       
+    print(">>>New stream key: ",stream_key)
+    return stream_key
+    
 
     
         
@@ -144,22 +175,37 @@ async def client_handler(reader,writer):
                     key=data_list[1]
                     stream_key = data_list[2]
                     print('key =',key,' stream key =',stream_key)                    
-                    # XADD stream_key 0-1 foo bar
+                    # XADD key 0-1 foo bar
                     #<millisecondsTime>-<sequenceNumber>
                     AddStream = True
+                    stream_key_parts = str(stream_key).split('-')
                     if key in data_store.keys() :
                         redis_obj=data_store.get(key)   
                         last_key=redis_obj.last_key
-                        valid,message = await valid_stream_key(stream_key,last_key)
-                        if valid:
-                            redis_obj.last_key = stream_key 
-                        else:
-                            AddStream = False
 
+                        if stream_key_parts[1].strip() != "*" :                           
+                            valid,message = await valid_stream_key(stream_key,last_key)
+                            if valid:
+                                redis_obj.last_key = stream_key 
+                            else:
+                                AddStream = False
+                        else:
+                            new_stream_key = await get_new_stream_key(stream_key_parts[0].strip(),redis_obj)
+                            stream_key = new_stream_key
+                            
                     else:
                         stream_key_parts = str(stream_key).split('-')
                         stream_key_millisecondsTime = int(stream_key_parts[0].strip())
-                        stream_key_sequenceNumber = int(stream_key_parts[1].strip())
+                        if stream_key_parts[1].strip() != "*" : 
+                            stream_key_sequenceNumber = int(stream_key_parts[1].strip())
+                        else:
+                            if stream_key_millisecondsTime == 0 :
+                                stream_key = '0-1'
+                                stream_key_sequenceNumber = 1
+                            else:
+                                stream_key = str(stream_key_millisecondsTime)+'-0'
+                                stream_key_sequenceNumber = 0
+                        
                         if stream_key_millisecondsTime == 0 and stream_key_sequenceNumber == 0:
                             message =f'-ERR The ID specified in XADD must be greater than 0-0\r\n'
                             AddStream = False
@@ -167,6 +213,7 @@ async def client_handler(reader,writer):
                             data_store[key] = RedisObject(data = [],data_type='stream') 
                             redis_obj=data_store.get(key)
                             redis_obj.last_key=stream_key
+                        
                     if AddStream :
                         new_stream_entry=StreamEntry(id=stream_key)
                         stream_entry_data=data_list[3:]
