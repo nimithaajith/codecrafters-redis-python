@@ -133,7 +133,9 @@ async def client_handler(reader,writer):
                     await writer.drain()                    
             elif no_of_elements > 1:
                 for token in input_tokens:
-                    if token.startswith('*') or token.startswith('$'):
+                    if len(token)>1 and token.startswith('*'):
+                        continue
+                    if token.startswith('$'):
                         continue
                     data_list.append(token.strip())
                 if data_list[0] == 'ECHO':
