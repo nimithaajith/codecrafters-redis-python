@@ -1,6 +1,10 @@
 import socket  # noqa: F401
 import asyncio
 from datetime import timezone,timedelta,datetime
+import time
+
+def get_milliseconds_time():
+    return int(time.time() * 1000)
 
 class RedisObject():
     def __init__(self,data=None,data_type=None,exp=None,counter=0):
@@ -182,7 +186,9 @@ async def client_handler(reader,writer):
                     if key in data_store.keys() :
                         redis_obj=data_store.get(key)   
                         last_key=redis_obj.last_key
-
+                        if stream_key_parts[0].strip() == '*':
+                            stream_key_parts[0]=str(get_milliseconds_time())
+                            stream_key=stream_key_parts[0]+'-'+stream_key_parts[1]
                         if stream_key_parts[1].strip() != "*" :                           
                             valid,message = await valid_stream_key(stream_key,last_key)
                             if valid:
