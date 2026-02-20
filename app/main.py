@@ -182,13 +182,12 @@ async def client_handler(reader,writer):
                     # XADD key 0-1 foo bar
                     #<millisecondsTime>-<sequenceNumber>
                     AddStream = True
+                    if stream_key == '*':
+                        stream_key=str(get_milliseconds_time()) +'-*'                            
                     stream_key_parts = str(stream_key).split('-')
                     if key in data_store.keys() :
                         redis_obj=data_store.get(key)   
                         last_key=redis_obj.last_key
-                        if stream_key_parts[0].strip() == '*':
-                            stream_key_parts[0]=str(get_milliseconds_time())
-                            stream_key=stream_key_parts[0]+'-'+stream_key_parts[1]
                         if stream_key_parts[1].strip() != "*" :                           
                             valid,message = await valid_stream_key(stream_key,last_key)
                             if valid:
