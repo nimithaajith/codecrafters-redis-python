@@ -1,4 +1,3 @@
-import socket  # noqa: F401
 import asyncio
 from datetime import timezone,timedelta,datetime
 import time
@@ -44,7 +43,21 @@ class StreamEntry():
         print("******Add entry finished*******")
 
 
-def get_stream_key(millisecondstime,stream_obj_list):   
+def get_last_stream_key(millisecondstime,stream_obj_list):   
+    last_sn=-1
+    for obj in stream_obj_list:
+        mst,sn=([int(part.strip()) for part in str(obj.id).split('-')])
+        if millisecondstime == mst:
+            if last_sn < sn:
+                last_sn=sn
+    if millisecondstime == 0 and last_sn == -1:
+        last_sn = 0
+    print(">>>Last sequence no: ",last_sn)
+
+    return str(millisecondstime)+'-'+str(last_sn+1)
+
+
+def get_next_stream_key(millisecondstime,stream_obj_list):   
     keydict={}
     last_sn=-1
     for obj in stream_obj_list:
@@ -93,11 +106,27 @@ async def get_new_stream_key(stream_key_part1,redis_obj):
             stream_key=stream_key_part1 + '-1'
         
     else:
-        stream_key = get_stream_key(stream_key_millisecondsTime,redis_obj.data)       
+        stream_key = get_next_stream_key(stream_key_millisecondsTime,redis_obj.data)       
     print(">>>New stream key: ",stream_key)
     return stream_key
     
-
+def get_xrange_response(redis_obj,start,end):
+    result=[]
+    for stream_obj in redis_obj.data:
+        l=0
+        if stream_obj.id >= start and stream_obj.id <= end:
+            l=len(stream_obj.entry)
+            result.append((l,stream_obj))
+    n1 = len(result)
+    print("result length =",n1)
+    result_str=f'*{n1}\r\n'
+    for length,obj in result:
+        print(">>>length,obj =",length,obj)
+        result_str=result_str+f'*{length}\r\n${len(obj.id)}\r\n{obj.id}\r\n'
+        for k,v in obj.entry.items():
+            print(">>>>>>k,v =",k,v)
+            result_str=result_str+f'${len(k)}\r\n{k}\r\n${len(v)}\r\n{v}\r\n'
+    return result_str   
     
         
 
@@ -242,7 +271,21 @@ async def client_handler(reader,writer):
                     else:
                         response = message
                     writer.write(response.encode())
-                    await writer.drain()         
+                    await writer.drain() 
+                elif data_list[0] == 'XRANGE': 
+                    key=data_list[1] 
+                    response=''
+                    if key in data_store.keys():
+                        print(">>>>>DATA LIST <<<<<<<<") 
+                        print(data_list)
+                        start=data_list[2]
+                        stop=data_list[3]
+                        redis_obj = data_store[key]
+                        response=get_xrange_response(redis_obj,start,stop)
+                        print("start-end:::",start,stop)
+                        print(response)
+                    writer.write(response.encode()) 
+                    await writer.drain()     
                 elif data_list[0] == 'TYPE': 
                     key=data_list[1]
                     if key in data_store.keys() :
@@ -272,11 +315,8 @@ async def run_server():
         print("Server execution failed : Error ->",str(e))
 
 def main():
-    # You can use print statements as follows for debugging, they'll be visible when running tests.
-    print("Logs from your program will appear here!")
+    print("Execution starts here....!")
 
-    # Uncomment the code below to pass the first stage
-    
     # server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
     # conn, _ =server_socket.accept() # wait for client        
     # while True :
