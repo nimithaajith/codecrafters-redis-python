@@ -123,6 +123,9 @@ async def get_new_stream_key(stream_key_part1,redis_obj):
 def get_xrange_response(redis_obj,start,end):
     print('XRANGE STARTED>>>>>>>')
     result=[]
+    if start == '-':
+        start = redis_obj.data[0].id
+        print(">>>Start rest to begining ::",start)
     starting_mst,starting_sn =get_mst_and_sn(start)
     print("START>>>",starting_mst,"   ",starting_sn)
     ending_mst,ending_sn=get_mst_and_sn(end)
