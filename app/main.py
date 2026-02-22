@@ -126,6 +126,10 @@ def get_xrange_response(redis_obj,start,end):
     if start == '-':
         start = redis_obj.data[0].id
         print(">>>Start rest to begining ::",start)
+    if end == '+':
+        end = redis_obj.data[-1].id
+        print(">>>end rest to last")
+        
     starting_mst,starting_sn =get_mst_and_sn(start)
     print("START>>>",starting_mst,"   ",starting_sn)
     ending_mst,ending_sn=get_mst_and_sn(end)
