@@ -264,11 +264,12 @@ async def client_handler(reader,writer):
                     await writer.drain() 
                 elif data_list[0] == 'RPUSH': 
                     key=data_list[1] 
-                    new_data=data_list[2]
+                    new_data_list=data_list[2:]
                     if key not in data_store.keys() :
                         data_store[key] = RedisObject(data = [],data_type='list') 
                     redis_obj=data_store.get(key) 
-                    redis_obj.data.append(new_data) 
+                    for new_data in new_data_list:
+                        redis_obj.data.append(new_data) 
                     print('>>>AFTER RPUSH>>>>') 
                     print(redis_obj.data)                      
                     n=len(redis_obj.data)    
