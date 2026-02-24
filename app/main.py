@@ -297,7 +297,7 @@ async def client_handler(reader,writer):
                         response=f'*0\r\n'
                     if result_list is not None:
                         length=len(result_list)
-                        response=f'*{length}\r\n'+'\r\n'.join(f'${len(item)}\r\n{item}' for item in result_list)
+                        response=f'*{length}\r\n'+'\r\n'.join(f'${len(item)}\r\n{item}' for item in result_list)+f'\r\n'
                     
                     print('>>>RESPONSE>>>>') 
                     print(response)                    
