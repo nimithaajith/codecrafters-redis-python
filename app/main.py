@@ -276,6 +276,33 @@ async def client_handler(reader,writer):
                     response=f':{n}\r\n'
                     writer.write(response.encode())
                     await writer.drain()
+                elif data_list[0] == 'LRANGE': 
+                    key=data_list[1] 
+                    start_index=int(data_list[2].strip())
+                    stop_index=int(data_list[3].strip())
+                    result_list=None                   
+                    if key  in data_store.keys() :                        
+                        redis_obj=data_store.get(key) 
+                        existing_list=redis_obj.data
+                        n=len(existing_list)  
+                        if start_index >= n or start_index > stop_index:
+                            response=f'*0\r\n'
+                        elif stop_index >= n:
+                            stop_index=n
+                            result_list=existing_list[start_index:stop_index]
+                        else:
+                            stop_index+=1
+                            result_list=existing_list[start_index:stop_index]
+                    else:
+                        response=f'*0\r\n'
+                    if result_list is not None:
+                        length=len(result_list)
+                        response=f'*{length}\r\n'+'\r\n'.join(f'${len(item)}\r\n{item}' for item in result_list)
+                    
+                    print('>>>RESPONSE>>>>') 
+                    print(response)                    
+                    writer.write(response.encode())
+                    await writer.drain()
                 elif data_list[0] == 'XADD': 
                     key=data_list[1]
                     stream_key = data_list[2]
