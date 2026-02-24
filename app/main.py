@@ -268,8 +268,6 @@ async def client_handler(reader,writer):
                     if key not in data_store.keys() :
                         data_store[key] = RedisObject(data = [],data_type='list') 
                     redis_obj=data_store.get(key) 
-                    print('>>>BEFORE RPUSH>>>>')  
-                    print(redis_obj.data)   
                     redis_obj.data.append(new_data) 
                     print('>>>AFTER RPUSH>>>>') 
                     print(redis_obj.data)                      
