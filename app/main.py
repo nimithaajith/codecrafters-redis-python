@@ -163,7 +163,27 @@ def get_xrange_response(redis_obj,start,end):
             result_str=result_str+f'${len(k)}\r\n{k}\r\n${len(v)}\r\n{v}\r\n'
     print('XRANGE COMPLETED>>>>>>>')
     return result_str   
-    
+
+def get_xread_response(redis_obj,start):
+    print('XREAD STARTED>>>>>>>')
+    result=[]
+    for stream_obj in redis_obj.data:
+        l=0
+        if stream_obj.id > start:
+                l=len(stream_obj.entry)
+                result.append((l,stream_obj))  
+        
+    n1 = len(result)
+    print("result length =",n1)
+    result_str=f'*{n1}\r\n'  
+    for length,obj in result:
+        print(">>>length,obj =",length,obj)
+        result_str=result_str+f'*2\r\n${len(obj.id)}\r\n{obj.id}\r\n*{length*2}\r\n' 
+        for k,v in obj.entry.items():
+            print(">>>>>>k,v =",k,v)
+            result_str=result_str+f'${len(k)}\r\n{k}\r\n${len(v)}\r\n{v}\r\n'
+    print('XEAD COMPLETED>>>>>>>')
+    return result_str
         
 
 async def get_data_type(val):
@@ -242,6 +262,21 @@ async def client_handler(reader,writer):
                         response=f"$-1\r\n"
                     writer.write(response.encode())
                     await writer.drain() 
+                elif data_list[0] == 'RPUSH': 
+                    key=data_list[1] 
+                    new_data=data_list[2]
+                    if key not in data_store.keys() :
+                        data_store[key] = RedisObject(data = [],data_type='list') 
+                    redis_obj=data_store.get(key) 
+                    print('>>>BEFORE RPUSH>>>>')  
+                    print(redis_obj.data)   
+                    redis_obj.data.append(new_data) 
+                    print('>>>AFTER RPUSH>>>>') 
+                    print(redis_obj.data)                      
+                    n=len(redis_obj.data)    
+                    response=f':{n}\r\n'
+                    writer.write(response.encode())
+                    await writer.drain()
                 elif data_list[0] == 'XADD': 
                     key=data_list[1]
                     stream_key = data_list[2]
@@ -321,7 +356,20 @@ async def client_handler(reader,writer):
                         print("start-end:::",start,stop)
                         print(response)
                     writer.write(response.encode()) 
-                    await writer.drain()     
+                    await writer.drain() 
+                elif data_list[0] == 'XREAD': 
+                    if data_list[1] == 'STREAMS':
+                        key=data_list[2]
+                        stream_key = data_list[3]
+                        response=''
+                        if key in data_store.keys():
+                            redis_obj = data_store[key]
+                            response=get_xread_response(redis_obj,stream_key)
+                    print(">>>>RESPONSE<<<<<")
+                    print(response)
+                    writer.write(response.encode()) 
+                    await writer.drain() 
+
                 elif data_list[0] == 'TYPE': 
                     key=data_list[1]
                     if key in data_store.keys() :
