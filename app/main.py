@@ -280,6 +280,7 @@ async def client_handler(reader,writer):
                     key=data_list[1] 
                     start_index=int(data_list[2].strip())
                     stop_index=int(data_list[3].strip())
+                    print(">>>start=",start_index,"stop= ",stop_index)                         
                     result_list=None                   
                     if key  in data_store.keys() :                        
                         redis_obj=data_store.get(key) 
@@ -287,12 +288,14 @@ async def client_handler(reader,writer):
                         n=len(existing_list) 
                         if start_index < 0 and start_index < -n:
                             start_index = 0
+                            print("$$$$$$$$$START set to zero")
                         elif stop_index <0 and stop_index < -n:
                             stop_index =0
-                        elif start_index <0 and stop_index<0:
+                            print("$$$$$$$$$STOP set to zero")
+                        if start_index <0 and stop_index<0:
                             start_index=n+start_index
                             stop_index=n+stop_index
-                            
+                            print("$$$$$$$$$reset start and stop")                            
                         elif start_index >=0 and stop_index < 0:
                             stop_index = n+stop_index
                         print(">>>start=",start_index,"stop= ",stop_index) 
