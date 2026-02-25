@@ -331,6 +331,18 @@ async def client_handler(reader,writer):
                     print(response)                    
                     writer.write(response.encode())
                     await writer.drain()
+                elif data_list[0] == 'LLEN': 
+                    key=data_list[1] 
+                    length=0
+                    if key in data_store:
+                        redis_obj=data_store[key]
+                        length=len(redis_obj.data)
+                        response=f':{length}\r\n'                    
+                    else:
+                        response=f':0\r\n'
+                    writer.write(response.encode())
+                    await writer.drain()
+
                 elif data_list[0] == 'XADD': 
                     key=data_list[1]
                     stream_key = data_list[2]
