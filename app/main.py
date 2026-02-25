@@ -290,7 +290,8 @@ async def client_handler(reader,writer):
                         elif stop_index <0 and stop_index < -n:
                             stop_index =0
                         elif start_index <0 and stop_index<0:
-                            start_index,stop_index=n+stop_index,n+start_index
+                            start_index=n+start_index
+                            stop_index=n+stop_index
                             
                         elif start_index >=0 and stop_index < 0:
                             stop_index = n+stop_index
