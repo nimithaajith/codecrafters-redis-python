@@ -262,6 +262,20 @@ async def client_handler(reader,writer):
                         response=f"$-1\r\n"
                     writer.write(response.encode())
                     await writer.drain() 
+                elif data_list[0] == 'LPUSH': 
+                    key=data_list[1] 
+                    new_data_list=data_list[2:]
+                    if key not in data_store.keys() :
+                        data_store[key] = RedisObject(data = [],data_type='list') 
+                    redis_obj=data_store.get(key) 
+                    for new_data in new_data_list:
+                        redis_obj.data.insert(0,new_data) 
+                    print('>>>AFTER LPUSH>>>>') 
+                    print(redis_obj.data)                      
+                    n=len(redis_obj.data)    
+                    response=f':{n}\r\n'
+                    writer.write(response.encode())
+                    await writer.drain()
                 elif data_list[0] == 'RPUSH': 
                     key=data_list[1] 
                     new_data_list=data_list[2:]
