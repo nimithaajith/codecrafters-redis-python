@@ -342,7 +342,18 @@ async def client_handler(reader,writer):
                         response=f':0\r\n'
                     writer.write(response.encode())
                     await writer.drain()
-
+                elif data_list[0] == 'LPOP': 
+                    key=data_list[1] 
+                    length=0
+                    if key in data_store:
+                        redis_obj=data_store[key]
+                        ele=redis_obj.data.pop(0)
+                        length=len(ele)
+                        response=f'${length}\r\n{ele}\r\n'                    
+                    if length == 0:
+                        response=f'$-1\r\n'
+                    writer.write(response.encode())
+                    await writer.drain()
                 elif data_list[0] == 'XADD': 
                     key=data_list[1]
                     stream_key = data_list[2]
