@@ -301,18 +301,14 @@ async def client_handler(reader,writer):
                         existing_list=redis_obj.data
                         n=len(existing_list) 
                         if start_index < 0 and start_index < -n:
-                            start_index = 0
-                            print("$$$$$$$$$START set to zero")
+                            start_index = 0                            
                         elif stop_index <0 and stop_index < -n:
-                            stop_index =0
-                            print("$$$$$$$$$STOP set to zero")
+                            stop_index =0                            
                         if start_index <0 and stop_index<0:
                             start_index=n+start_index
-                            stop_index=n+stop_index
-                            print("$$$$$$$$$reset start and stop")                            
+                            stop_index=n+stop_index                                                      
                         elif start_index >=0 and stop_index < 0:
                             stop_index = n+stop_index
-                        print(">>>start=",start_index,"stop= ",stop_index) 
                         if start_index >= n or start_index > stop_index:
                             response=f'*0\r\n'
                         elif stop_index >= n:
@@ -345,13 +341,33 @@ async def client_handler(reader,writer):
                 elif data_list[0] == 'LPOP': 
                     key=data_list[1] 
                     length=0
+                    n=len(data_list)
                     if key in data_store:
                         redis_obj=data_store[key]
-                        ele=redis_obj.data.pop(0)
-                        length=len(ele)
-                        response=f'${length}\r\n{ele}\r\n'                    
+                        
+                        if redis_obj.data:
+                            if n <3 :
+                                ele=redis_obj.data.pop(0)
+                                length=len(ele)
+                                response=f'${length}\r\n{ele}\r\n'  
+                            elif n>2:
+                                pop_count=int(data_list[2])
+                                if pop_count > n:
+                                    pop_count=n
+                                popped_elements=[]
+                                for i in range(pop_count):
+                                    popped_elements.append(redis_obj.data.pop(0))
+                                length=len(popped_elements)
+                                print(f'>>>Popping {pop_count} elements<<<')
+                                print(popped_elements)
+                                print(">>>remaining elements<<<<<")
+                                print(redis_obj.data)
+                                response=f'*{length}\r\n'+''.join([f'${len(ele)}\r\n{ele}\r\n' for ele in popped_elements])
+                                                                  
                     if length == 0:
                         response=f'$-1\r\n'
+                    print('###RESPONSE###')
+                    print(response)
                     writer.write(response.encode())
                     await writer.drain()
                 elif data_list[0] == 'XADD': 
