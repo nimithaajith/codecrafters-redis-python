@@ -315,9 +315,10 @@ async def client_handler(reader,writer):
                     await writer.drain()
                     blpop_que=redis_obj.blocked_clients  #deque of client tuples and client is tuple(writer, expires_on)
                     if blpop_que:
+                        print(f'###{len(blpop_que)} BLPOP CLIENTS FOUND###')                 
                         while redis_obj.data:
                             if blpop_que :                             
-                                client_writer = blpop_que.popleft()[0]
+                                client_writer,_ = blpop_que.popleft()
                                 value = redis_obj.data.pop(0)
                                 response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'
                                 client_writer.write(response.encode())
@@ -326,7 +327,7 @@ async def client_handler(reader,writer):
                                 print(response)
                             else:
                                 break
-                                         
+                        redis_obj.blocked_clients=blpop_que                                         
                         
                 elif data_list[0] == 'RPUSH': 
                     key=data_list[1] 
@@ -339,18 +340,20 @@ async def client_handler(reader,writer):
                     print('>>>AFTER RPUSH>>>>') 
                     print(redis_obj.data) 
                     blpop_que=redis_obj.blocked_clients  #deque of client tuples and client is tuple(writer, expires_on)
-                    if blpop_que:
+                    if blpop_que: 
+                        print(f'###{len(blpop_que)} BLPOP CLIENTS FOUND###')                        
                         while redis_obj.data:
                             if blpop_que :                             
-                                client_writer = blpop_que.popleft()[0]
+                                client_writer,_ = blpop_que.popleft()
                                 value = redis_obj.data.pop(0)
                                 response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'
                                 client_writer.write(response.encode())
                                 await client_writer.drain()
-                                print('###RESPONSE###')
+                                print('###RESPONSE TO BLPOP CLIENT###')                                
                                 print(response)
                             else:
                                 break
+                        redis_obj.blocked_clients=blpop_que
                     else:
                         n=len(redis_obj.data)
                         response=f':{n}\r\n'
@@ -418,7 +421,7 @@ async def client_handler(reader,writer):
                             ele=redis_obj.data.pop(0)
                             length=len(ele)
                             response=f'*2\r\n${len(key)}\r\n{key}\r\n${length}\r\n{ele}\r\n' 
-                            print('###RESPONSE###')
+                            print('###RESPONSE TO BLPOP CLIENT###')
                             print(response)
                             writer.write(response.encode())
                             await writer.drain() 
@@ -432,7 +435,9 @@ async def client_handler(reader,writer):
                             client_tuple=tuple((writer,expires_on))
                             redis_obj.blocked_clients.append(client_tuple)  
                             print('###add to blocked clients###')
-                            print(redis_obj.blocked_clients)
+                            print(f'###{len(redis_obj.blocked_clients)} BLPOP CLIENTS WAITING NOW###')                        
+                        
+                            
                     else:
                             data_store[key] = RedisObject(data = [],data_type='list')                             
                             redis_obj=data_store.get(key) 
