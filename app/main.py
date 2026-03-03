@@ -434,6 +434,15 @@ async def client_handler(reader,writer):
                             print('###add to blocked clients###')
                             print(redis_obj.blocked_clients)
                     else:
+                            data_store[key] = RedisObject(data = [],data_type='list')                             
+                            redis_obj=data_store.get(key) 
+                            if waits_for == 0:
+                                expires_on= datetime.max.replace(tzinfo=timezone.utc) # set to infinite datetime
+                            else:
+                                expires_on=datetime.now(timezone.utc) + timedelta(seconds=waits_for)
+                            
+                            client_tuple=tuple((writer,expires_on))
+                            redis_obj.blocked_clients.append(client_tuple)  
                             response=f'$-1\r\n'
                             print('###RESPONSE###')
                             print(response)
