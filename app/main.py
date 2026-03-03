@@ -441,7 +441,7 @@ async def client_handler(reader,writer):
                             redis_obj.blocked_clients.append(client_tuple)  
                             print('###add to blocked clients###')
                             print(f'###{len(redis_obj.blocked_clients)} BLPOP CLIENTS WAITING NOW###')                        
-                        
+                            continue
                             
                     else:
                             data_store[key] = RedisObject(data = [],data_type='list')                             
