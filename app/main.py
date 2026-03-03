@@ -230,11 +230,11 @@ async def client_handler(reader,writer):
             input_query=await reader.read(1024)
             print("Received query :",input_query)
             if not input_query:
-                break
+                continue
             query_string=str(input_query.decode()) 
             print("query_string :",query_string)           
             if not query_string.startswith("*"):
-                break
+                continue
             input_tokens=query_string.splitlines()
             print("input_tokens :",input_tokens) 
             no_of_elements=int(input_tokens[0].lstrip('*'))               
@@ -316,17 +316,18 @@ async def client_handler(reader,writer):
                     blpop_que=redis_obj.blocked_clients  #deque of client tuples and client is tuple(writer, expires_on)
                     if blpop_que:
                         print(f'###{len(blpop_que)} BLPOP CLIENTS FOUND###')                 
-                        while redis_obj.data:
-                            if blpop_que :                             
-                                client_writer,_ = blpop_que.popleft()
-                                value = redis_obj.data.pop(0)
-                                response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'
-                                client_writer.write(response.encode())
-                                await client_writer.drain()
-                                print('###RESPONSE###')
-                                print(response)
-                            else:
-                                break
+                        while redis_obj.data and blpop_que:
+                                                       
+                            client_writer,_ = blpop_que.popleft()
+                            print("is_closing:", client_writer.is_closing())
+                            value = redis_obj.data.pop(0)
+                            response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'
+                            print("is_closing:", client_writer.is_closing())
+                            client_writer.write(response.encode())
+                            await client_writer.drain()
+                            print('###RESPONSE###')
+                            print(response)
+                        
                         redis_obj.blocked_clients=blpop_que                                         
                         
                 elif data_list[0] == 'RPUSH': 
@@ -343,19 +344,18 @@ async def client_handler(reader,writer):
                     if blpop_que: 
                         print(f'###{len(blpop_que)} BLPOP CLIENTS FOUND###')
                         try:                        
-                            while redis_obj.data:
-                                if blpop_que :  
-                                    client_writer,_ = blpop_que.popleft()
-                                    value = redis_obj.data.pop(0)
-                                    print("value =", value)
-                                    response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'
-                                    print(response)
-                                    client_writer.write(response.encode())
-                                    await client_writer.drain()
-                                    print('###RESPONSE TO BLPOP CLIENT###')                                
-                                    
-                                else:
-                                    break
+                            while redis_obj.data and blpop_que:                                 
+                                client_writer,_ = blpop_que.popleft()
+                                print("is_closing:", client_writer.is_closing())
+                                value = redis_obj.data.pop(0)
+                                print("value =", value)
+                                response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'
+                                print(response)
+                                print("is_closing:", client_writer.is_closing())
+                                client_writer.write(response.encode())
+                                await client_writer.drain()
+                                print('###RESPONSE TO BLPOP CLIENT###')                         
+                                
                             redis_obj.blocked_clients=blpop_que
                         except Exception as e:
                             print("!!!!!!!!!!!",e)
