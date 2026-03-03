@@ -345,9 +345,7 @@ async def client_handler(reader,writer):
                         try:                        
                             while redis_obj.data:
                                 if blpop_que :  
-                                    print("blpop_que", blpop_que)                           
                                     client_writer,_ = blpop_que.popleft()
-                                    print("client_writer =", client_writer)
                                     value = redis_obj.data.pop(0)
                                     print("value =", value)
                                     response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'
@@ -455,11 +453,12 @@ async def client_handler(reader,writer):
                             
                             client_tuple=tuple((writer,expires_on))
                             redis_obj.blocked_clients.append(client_tuple)  
-                            response=f'$-1\r\n'
-                            print('###RESPONSE###')
-                            print(response)
-                            writer.write(response.encode())
-                            await writer.drain()
+                            continue
+                            # response=f'$-1\r\n'
+                            # print('###RESPONSE###')
+                            # print(response)
+                            # writer.write(response.encode())
+                            # await writer.drain()
                 elif data_list[0] == 'LPOP': 
                     key=data_list[1] 
                     length=0
