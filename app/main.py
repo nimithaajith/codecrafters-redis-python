@@ -1,6 +1,9 @@
 import asyncio
 from datetime import timezone,timedelta,datetime
 import time
+import threading
+from collections import deque
+
 
 
 class RedisObject():
@@ -10,6 +13,7 @@ class RedisObject():
         self.counter = counter
         self.data_type = data_type
         self.last_key=None
+        self.blocked_clients=deque() #deque object
 
     def add_data(self,data):
         self.data = data
@@ -39,6 +43,33 @@ class StreamEntry():
             print("stream entry dict")  
             print(self.entry)
         print("******Add entry finished*******")
+
+data_store={}
+
+async def blocked_client_handler():
+    print("############blocked_client_handler#############")
+    while True:
+        if data_store:
+            for key in data_store:
+                if data_store[key].blocked_clients:
+                    blocked_clients=data_store[key].blocked_clients
+                    new_deque =deque()
+                    for client_tuple in blocked_clients:
+                        client_writer,expires_on=client_tuple
+                        if datetime.now(timezone.utc) >= expires_on:
+                            print("******REMOVED BLPOP CLIENT*******")
+                            response='*-1\r\n'
+                            client_writer.write(response.encode())
+                            await client_writer.drain()
+                        else:
+                            new_deque.append(client_tuple)
+                    data_store[key].blocked_clients=new_deque
+        await asyncio.sleep(0.5)   # check twice per second
+                    
+                        
+
+
+
 
 def get_milliseconds_time():
     return int(time.time() * 1000)
@@ -121,14 +152,14 @@ async def get_new_stream_key(stream_key_part1,redis_obj):
     return stream_key
     
 def get_xrange_response(redis_obj,start,end):
-    print('XRANGE STARTED>>>>>>>')
+    
     result=[]
     if start == '-':
         start = redis_obj.data[0].id
-        print(">>>Start rest to begining ::",start)
+        #start set to begining 
     if end == '+':
         end = redis_obj.data[-1].id
-        print(">>>end rest to last")
+        #end set to last
         
     starting_mst,starting_sn =get_mst_and_sn(start)
     print("START>>>",starting_mst,"   ",starting_sn)
@@ -141,12 +172,12 @@ def get_xrange_response(redis_obj,start,end):
         print('CHECKING ID>>>>>>>',stream_obj.id)   
         print(mst,"   ",sn)              
         if starting_mst is not None and starting_sn is not None and ending_mst is not None and ending_sn is not None :
-            print('all key parts exists!!!!')   
+            #'all key parts exists!!!!  
             if mst >= starting_mst and mst <= ending_mst and sn >= starting_sn and sn<= ending_sn:
                 l=len(stream_obj.entry)
                 result.append((l,stream_obj))
         elif starting_mst is not None and ending_mst is not None and starting_sn is None and ending_sn is None:
-            print('!!!!no sequence number')
+            #!!!!no sequence number'
             if all(( mst >= starting_mst, mst <= ending_mst)):
                 l=len(stream_obj.entry)
                 result.append((l,stream_obj))
@@ -177,12 +208,11 @@ def get_xread_response(redis_obj,start):
     print("result length =",n1)
     result_str=f'*{n1}\r\n'  
     for length,obj in result:
-        print(">>>length,obj =",length,obj)
+        #appending each entry object of the stream and number of key-value pairs
         result_str=result_str+f'*2\r\n${len(obj.id)}\r\n{obj.id}\r\n*{length*2}\r\n' 
         for k,v in obj.entry.items():
-            print(">>>>>>k,v =",k,v)
+            # appending key-value pairs of the stream entry
             result_str=result_str+f'${len(k)}\r\n{k}\r\n${len(v)}\r\n{v}\r\n'
-    print('XEAD COMPLETED>>>>>>>')
     return result_str
         
 
@@ -194,8 +224,7 @@ async def get_data_type(val):
 
 async def client_handler(reader,writer):
     try:
-        print("Connected...")
-        data_store={}
+        print("Connected...")        
         CONNECT = True
         while CONNECT:
             input_query=await reader.read(1024)
@@ -232,6 +261,8 @@ async def client_handler(reader,writer):
                     response=f"${string_length}\r\n{echo_data}\r\n"  
                     writer.write(response.encode())
                     await writer.drain() 
+                    print('###RESPONSE###')
+                    print(response)
                 elif data_list[0] == 'SET':
                     key=data_list[1]
                     val=data_list[2]
@@ -247,6 +278,8 @@ async def client_handler(reader,writer):
                     response=f"+OK\r\n"  
                     writer.write(response.encode())
                     await writer.drain() 
+                    print('###RESPONSE###')
+                    print(response)
                 elif data_list[0] == 'GET': 
                     key=data_list[1]
                     if key in data_store.keys() :
@@ -261,7 +294,9 @@ async def client_handler(reader,writer):
                     else:
                         response=f"$-1\r\n"
                     writer.write(response.encode())
-                    await writer.drain() 
+                    await writer.drain()
+                    print('###RESPONSE###')
+                    print(response) 
                 elif data_list[0] == 'LPUSH': 
                     key=data_list[1] 
                     new_data_list=data_list[2:]
@@ -271,11 +306,28 @@ async def client_handler(reader,writer):
                     for new_data in new_data_list:
                         redis_obj.data.insert(0,new_data) 
                     print('>>>AFTER LPUSH>>>>') 
-                    print(redis_obj.data)                      
+                    print(redis_obj.data) 
                     n=len(redis_obj.data)    
                     response=f':{n}\r\n'
+                    print('>>>RESPONSE>>>>') 
+                    print(response) 
                     writer.write(response.encode())
                     await writer.drain()
+                    blpop_que=redis_obj.blocked_clients  #deque of client tuples and client is tuple(writer, expires_on)
+                    if blpop_que:
+                        while redis_obj.data:
+                            if blpop_que :                             
+                                client_writer = blpop_que.popleft()[0]
+                                value = redis_obj.data.pop(0)
+                                response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'
+                                client_writer.write(response.encode())
+                                await client_writer.drain()
+                                print('###RESPONSE###')
+                                print(response)
+                            else:
+                                break
+                                         
+                        
                 elif data_list[0] == 'RPUSH': 
                     key=data_list[1] 
                     new_data_list=data_list[2:]
@@ -285,11 +337,27 @@ async def client_handler(reader,writer):
                     for new_data in new_data_list:
                         redis_obj.data.append(new_data) 
                     print('>>>AFTER RPUSH>>>>') 
-                    print(redis_obj.data)                      
-                    n=len(redis_obj.data)    
-                    response=f':{n}\r\n'
-                    writer.write(response.encode())
-                    await writer.drain()
+                    print(redis_obj.data) 
+                    blpop_que=redis_obj.blocked_clients  #deque of client tuples and client is tuple(writer, expires_on)
+                    if blpop_que:
+                        while redis_obj.data:
+                            if blpop_que :                             
+                                client_writer = blpop_que.popleft()[0]
+                                value = redis_obj.data.pop(0)
+                                response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'
+                                client_writer.write(response.encode())
+                                await client_writer.drain()
+                                print('###RESPONSE###')
+                                print(response)
+                            else:
+                                break
+                    else:
+                        n=len(redis_obj.data)
+                        response=f':{n}\r\n'
+                        writer.write(response.encode())
+                        await writer.drain()
+                        print('###RESPONSE###')
+                        print(response)
                 elif data_list[0] == 'LRANGE': 
                     key=data_list[1] 
                     start_index=int(data_list[2].strip())
@@ -336,8 +404,41 @@ async def client_handler(reader,writer):
                         response=f':{length}\r\n'                    
                     else:
                         response=f':0\r\n'
+                    print('###RESPONSE###')
+                    print(response)
                     writer.write(response.encode())
                     await writer.drain()
+                elif data_list[0] == 'BLPOP': 
+                    key=data_list[1] 
+                    waits_for=int(data_list[2]) # in seconds, 0 for infinite
+                    if key in data_store:
+                        redis_obj=data_store[key]
+                        if redis_obj.data:
+                            # if data is available , send it to client immediately
+                            ele=redis_obj.data.pop(0)
+                            length=len(ele)
+                            response=f'*2\r\n${len(key)}\r\n{key}\r\n${length}\r\n{ele}\r\n' 
+                            print('###RESPONSE###')
+                            print(response)
+                            writer.write(response.encode())
+                            await writer.drain() 
+                        else:
+                            # if data is not available add to blocked clients
+                            if waits_for == 0:
+                                expires_on= datetime.max.replace(tzinfo=timezone.utc) # set to infinite datetime
+                            else:
+                                expires_on=datetime.now(timezone.utc) + timedelta(seconds=waits_for)
+                            
+                            client_tuple=tuple((writer,expires_on))
+                            redis_obj.blocked_clients.append(client_tuple)  
+                            print('###add to blocked clients###')
+                            print(redis_obj.blocked_clients)
+                    else:
+                            response=f'$-1\r\n'
+                            print('###RESPONSE###')
+                            print(response)
+                            writer.write(response.encode())
+                            await writer.drain()
                 elif data_list[0] == 'LPOP': 
                     key=data_list[1] 
                     length=0
@@ -487,6 +588,7 @@ async def run_server():
     try:
         redis_server=await asyncio.start_server(client_handler,host="localhost",port=6379)
         print(f'Redis server listening {redis_server.sockets[0].getsockname()}')
+        asyncio.create_task(blocked_client_handler())                    
         await redis_server.serve_forever()
     except Exception as e:
         print("Server execution failed : Error ->",str(e))
