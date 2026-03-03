@@ -347,10 +347,11 @@ async def client_handler(reader,writer):
                                 client_writer,_ = blpop_que.popleft()
                                 value = redis_obj.data.pop(0)
                                 response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'
+                                print(response)
                                 client_writer.write(response.encode())
                                 await client_writer.drain()
                                 print('###RESPONSE TO BLPOP CLIENT###')                                
-                                print(response)
+                                
                             else:
                                 break
                         redis_obj.blocked_clients=blpop_que
