@@ -408,7 +408,6 @@ async def client_handler(reader,writer):
                             print('###add to blocked clients###')
                             SERVERD=False
                             while not SERVERD:
-
                                 if client_tuple in redis_obj.blocked_clients:
                                     if client_tuple == redis_obj.blocked_clients[0] and redis_obj.data:
                                         value = redis_obj.data.pop(0)
@@ -418,7 +417,7 @@ async def client_handler(reader,writer):
                                         await writer.drain()
                                         SERVERD=True
                                     else:
-                                        await asyncio.sleep(0.2)
+                                        await asyncio.sleep(0.02)
                                 else:
                                     SERVERD=True                    
                     else:
