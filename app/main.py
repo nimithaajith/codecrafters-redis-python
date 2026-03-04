@@ -64,9 +64,27 @@ async def blocked_client_handler():
                             await client_writer.drain()
                         
                     data_store[key].blocked_clients=blocked_clients
+
         await asyncio.sleep(0.5)   # check twice per second
                     
-                        
+async def get_blpop_response(client_tuple) :
+    key =client_tuple[2]
+    redis_obj=data_store[key]
+    SERVERD=False
+    while not SERVERD:
+        if client_tuple in redis_obj.blocked_clients:
+            if client_tuple == redis_obj.blocked_clients[0] and redis_obj.data:
+                value = redis_obj.data.pop(0)
+                redis_obj.blocked_clients.popleft()
+                response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'   
+                SERVERD=True                                      
+                return response
+            
+
+            else:
+                await asyncio.sleep(0.01)
+        else:
+            SERVERD=True   
 
 
 
@@ -403,23 +421,11 @@ async def client_handler(reader,writer):
                             else:
                                 expires_on=datetime.now(timezone.utc) + timedelta(seconds=waits_for)
                             
-                            client_tuple=tuple((writer,expires_on))
+                            client_tuple=tuple((writer,expires_on,key))
                             redis_obj.blocked_clients.append(client_tuple)                              
                             print('###add to blocked clients###')
-                            SERVERD=False
-                            while not SERVERD:
-                                if client_tuple in redis_obj.blocked_clients:
-                                    if client_tuple == redis_obj.blocked_clients[0] and redis_obj.data:
-                                        value = redis_obj.data.pop(0)
-                                        redis_obj.blocked_clients.popleft()
-                                        response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'                                        
-                                        writer.write(response.encode())
-                                        await writer.drain()
-                                        SERVERD=True
-                                    else:
-                                        await asyncio.sleep(0.02)
-                                else:
-                                    SERVERD=True                    
+                            response = await get_blpop_response(client_tuple)
+                                             
                     else:
                             data_store[key] = RedisObject(data = [],data_type='list')                             
                             redis_obj=data_store.get(key) 
@@ -428,14 +434,15 @@ async def client_handler(reader,writer):
                             else:
                                 expires_on=datetime.now(timezone.utc) + timedelta(seconds=waits_for)
                             
-                            client_tuple=tuple((writer,expires_on))
+                            client_tuple=tuple((writer,expires_on,key))
                             redis_obj.blocked_clients.append(client_tuple)  
-                            continue
+                            response = await get_blpop_response(client_tuple)
                             # response=f'$-1\r\n'
                             # print('###RESPONSE###')
                             # print(response)
-                            # writer.write(response.encode())
-                            # await writer.drain()
+                    writer.write(response.encode())
+                    await writer.drain()
+                    print("send response>>>>>>>>>>>>>>")
                 elif data_list[0] == 'LPOP': 
                     key=data_list[1] 
                     length=0
