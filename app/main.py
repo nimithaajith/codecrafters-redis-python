@@ -247,17 +247,15 @@ async def client_handler(reader,writer):
         CONNECT = True
         while CONNECT:
             input_query=await reader.read(1024)
-            print("Received query :",input_query)
             if not input_query:
+                await asyncio.sleep(0.2)
                 continue
             query_string=str(input_query.decode()) 
-            print("query_string :",query_string)           
             if not query_string.startswith("*"):
+                await asyncio.sleep(0.2)
                 continue
             input_tokens=query_string.splitlines()
-            print("input_tokens :",input_tokens) 
             no_of_elements=int(input_tokens[0].lstrip('*'))               
-            print("no_of_elements :",input_tokens[0], no_of_elements) 
             data_list=[]
             if no_of_elements == 1:
                 if input_tokens[2] == 'PING':
@@ -267,6 +265,7 @@ async def client_handler(reader,writer):
             elif no_of_elements > 1:
                 for token in input_tokens:
                     if len(token)>1 and token.startswith('*'):
+                        
                         continue
                     if token.startswith('$'):
                         continue
