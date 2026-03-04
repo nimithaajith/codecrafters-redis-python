@@ -458,8 +458,8 @@ async def client_handler(reader,writer):
                                 response=f'${length}\r\n{ele}\r\n'  
                             elif n>2:
                                 pop_count=int(data_list[2])
-                                if pop_count > n:
-                                    pop_count=n
+                                if pop_count > len(redis_obj.data):
+                                    pop_count=len(redis_obj.data)
                                 popped_elements=[]
                                 for i in range(pop_count):
                                     popped_elements.append(redis_obj.data.pop(0))
