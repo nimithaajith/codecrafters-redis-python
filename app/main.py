@@ -59,9 +59,9 @@ async def blocked_client_handler():
                         if datetime.now(timezone.utc) >= expires_on:
                             blocked_clients.remove(client_tuple)
                             print("******REMOVED BLPOP CLIENT*******")
-                            response='*-1\r\n'
-                            client_writer.write(response.encode())
-                            await client_writer.drain()
+                            # response='*-1\r\n'
+                            # client_writer.write(response.encode())
+                            # await client_writer.drain()
                         
                     data_store[key].blocked_clients=blocked_clients
 
@@ -84,7 +84,8 @@ async def get_blpop_response(client_tuple) :
             else:
                 await asyncio.sleep(0.01)
         else:
-            SERVERD=True   
+            response = '$-1\r\n'
+            return response  
 
 
 
@@ -321,15 +322,13 @@ async def client_handler(reader,writer):
                     if key not in data_store.keys() :
                         data_store[key] = RedisObject(data = [],data_type='list') 
                     redis_obj=data_store.get(key) 
+                    n=len(redis_obj.data)+len(new_data_list)  
                     if new_data_list:
                         for new_data in new_data_list:
                             redis_obj.data.insert(0,new_data) 
-                    print('>>>AFTER LPUSH>>>>') 
-                    print(redis_obj.data) 
-                    n=len(redis_obj.data)                       
+                    if redis_obj.blocked_clients and redis_obj.data:
+                        pass                    
                     response=f':{n}\r\n'
-                    print('>>>RESPONSE>>>>') 
-                    print(response) 
                     writer.write(response.encode())
                     await writer.drain()                                                          
                         
@@ -338,18 +337,17 @@ async def client_handler(reader,writer):
                     new_data_list=data_list[2:]
                     if key not in data_store.keys() :
                         data_store[key] = RedisObject(data = [],data_type='list') 
-                    redis_obj=data_store.get(key)                    
+                    redis_obj=data_store.get(key) 
+                    n=len(redis_obj.data)+len(new_data_list)                   
                     if new_data_list:
                         for new_data in new_data_list:
                             redis_obj.data.append(new_data) 
-                    print('>>>AFTER RPUSH>>>>') 
-                    print(redis_obj.data)                     
-                    n=len(redis_obj.data)
+                        
+                    if redis_obj.blocked_clients and redis_obj.data:
+                        pass
                     response=f':{n}\r\n'
                     writer.write(response.encode())
-                    await writer.drain()
-                    print('###RESPONSE###')
-                    print(response)
+                    await writer.drain()                    
                 elif data_list[0] == 'LRANGE': 
                     key=data_list[1] 
                     start_index=int(data_list[2].strip())
@@ -440,9 +438,12 @@ async def client_handler(reader,writer):
                             # response=f'$-1\r\n'
                             # print('###RESPONSE###')
                             # print(response)
-                    writer.write(response.encode())
-                    await writer.drain()
-                    print("send response>>>>>>>>>>>>>>")
+                    if not writer.is_closing():
+                        print('###RESPONSE###')
+                        print(response)
+                        writer.write(response.encode())
+                        await writer.drain()
+                        print("send response>>>>>>>>>>>>>>")
                 elif data_list[0] == 'LPOP': 
                     key=data_list[1] 
                     length=0
