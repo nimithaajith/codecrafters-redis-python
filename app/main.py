@@ -304,6 +304,7 @@ async def client_handler(reader,writer):
                         data_store[key] = RedisObject(data = [],data_type='list') 
                     redis_obj=data_store.get(key) 
                     blpop_que=redis_obj.blocked_clients  #deque of client tuples and client is tuple(writer, expires_on)
+                    new_n=len(new_data_list)
                     if blpop_que:
                         while new_data_list and blpop_que:                                                       
                             client_writer,_ = blpop_que.popleft()
@@ -315,12 +316,13 @@ async def client_handler(reader,writer):
                             print(response)
                             client_writer=None                        
                         redis_obj.blocked_clients=blpop_que
+                    n=len(redis_obj.data)+new_n
                     if new_data_list:
                         for new_data in new_data_list:
                             redis_obj.data.insert(0,new_data) 
                     print('>>>AFTER LPUSH>>>>') 
                     print(redis_obj.data) 
-                    n=len(redis_obj.data)    
+                       
                     response=f':{n}\r\n'
                     print('>>>RESPONSE>>>>') 
                     print(response) 
@@ -337,6 +339,7 @@ async def client_handler(reader,writer):
 
                     #checking for BLPOP and serving the clients if any
                     blpop_que=redis_obj.blocked_clients  #deque of client tuples and client is tuple(writer, expires_on)
+                    new_n=len(new_data_list)
                     if blpop_que: 
                         try:                        
                             while new_data_list and blpop_que:                                 
@@ -351,13 +354,13 @@ async def client_handler(reader,writer):
                             redis_obj.blocked_clients=blpop_que
                         except Exception as e:
                             print("!!!!!!!!!!!",e)
-                    
+                    n=len(redis_obj.data)+new_n
                     if new_data_list:
                         for new_data in new_data_list:
                             redis_obj.data.append(new_data) 
                     print('>>>AFTER RPUSH>>>>') 
                     print(redis_obj.data)                     
-                    n=len(redis_obj.data)
+                    
                     response=f':{n}\r\n'
                     writer.write(response.encode())
                     await writer.drain()
