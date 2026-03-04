@@ -303,8 +303,21 @@ async def client_handler(reader,writer):
                     if key not in data_store.keys() :
                         data_store[key] = RedisObject(data = [],data_type='list') 
                     redis_obj=data_store.get(key) 
-                    for new_data in new_data_list:
-                        redis_obj.data.insert(0,new_data) 
+                    blpop_que=redis_obj.blocked_clients  #deque of client tuples and client is tuple(writer, expires_on)
+                    if blpop_que:
+                        while new_data_list and blpop_que:                                                       
+                            client_writer,_ = blpop_que.popleft()
+                            value = new_data_list.pop(0)
+                            response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'
+                            client_writer.write(response.encode())
+                            await client_writer.drain()
+                            print('###RESPONSE###')
+                            print(response)
+                            client_writer=None                        
+                        redis_obj.blocked_clients=blpop_que
+                    if new_data_list:
+                        for new_data in new_data_list:
+                            redis_obj.data.insert(0,new_data) 
                     print('>>>AFTER LPUSH>>>>') 
                     print(redis_obj.data) 
                     n=len(redis_obj.data)    
@@ -313,59 +326,43 @@ async def client_handler(reader,writer):
                     print(response) 
                     writer.write(response.encode())
                     await writer.drain()
-                    blpop_que=redis_obj.blocked_clients  #deque of client tuples and client is tuple(writer, expires_on)
-                    if blpop_que:
-                        print(f'###{len(blpop_que)} BLPOP CLIENTS FOUND###')                 
-                        while redis_obj.data and blpop_que:
-                                                       
-                            client_writer,_ = blpop_que.popleft()
-                            print("is_closing:", client_writer.is_closing())
-                            value = redis_obj.data.pop(0)
-                            response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'
-                            print("is_closing:", client_writer.is_closing())
-                            client_writer.write(response.encode())
-                            await client_writer.drain()
-                            print('###RESPONSE###')
-                            print(response)
-                        
-                        redis_obj.blocked_clients=blpop_que                                         
+                                                             
                         
                 elif data_list[0] == 'RPUSH': 
                     key=data_list[1] 
                     new_data_list=data_list[2:]
                     if key not in data_store.keys() :
                         data_store[key] = RedisObject(data = [],data_type='list') 
-                    redis_obj=data_store.get(key) 
-                    for new_data in new_data_list:
-                        redis_obj.data.append(new_data) 
-                    print('>>>AFTER RPUSH>>>>') 
-                    print(redis_obj.data) 
+                    redis_obj=data_store.get(key)
+
+                    #checking for BLPOP and serving the clients if any
                     blpop_que=redis_obj.blocked_clients  #deque of client tuples and client is tuple(writer, expires_on)
                     if blpop_que: 
-                        print(f'###{len(blpop_que)} BLPOP CLIENTS FOUND###')
                         try:                        
-                            while redis_obj.data and blpop_que:                                 
+                            while new_data_list and blpop_que:                                 
                                 client_writer,_ = blpop_que.popleft()
-                                print("is_closing:", client_writer.is_closing())
-                                value = redis_obj.data.pop(0)
-                                print("value =", value)
+                                value = new_data_list.pop(0)
                                 response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'
-                                print(response)
-                                print("is_closing:", client_writer.is_closing())
                                 client_writer.write(response.encode())
                                 await client_writer.drain()
-                                print('###RESPONSE TO BLPOP CLIENT###')                         
-                                
+                                print('###RESPONSE TO BLPOP CLIENT###') 
+                                print(response)                         
+                                client_writer=None
                             redis_obj.blocked_clients=blpop_que
                         except Exception as e:
                             print("!!!!!!!!!!!",e)
-                    else:
-                        n=len(redis_obj.data)
-                        response=f':{n}\r\n'
-                        writer.write(response.encode())
-                        await writer.drain()
-                        print('###RESPONSE###')
-                        print(response)
+                    
+                    if new_data_list:
+                        for new_data in new_data_list:
+                            redis_obj.data.append(new_data) 
+                    print('>>>AFTER RPUSH>>>>') 
+                    print(redis_obj.data)                     
+                    n=len(redis_obj.data)
+                    response=f':{n}\r\n'
+                    writer.write(response.encode())
+                    await writer.drain()
+                    print('###RESPONSE###')
+                    print(response)
                 elif data_list[0] == 'LRANGE': 
                     key=data_list[1] 
                     start_index=int(data_list[2].strip())
