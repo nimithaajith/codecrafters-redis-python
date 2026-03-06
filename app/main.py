@@ -55,7 +55,7 @@ async def blocked_client_handler():
                     blocked_clients=data_store[key].blocked_clients
                     
                     for client_tuple in blocked_clients:
-                        client_writer,expires_on=client_tuple
+                        _,expires_on,_=client_tuple
                         if datetime.now(timezone.utc) >= expires_on:
                             blocked_clients.remove(client_tuple)
                             print("******REMOVED BLPOP CLIENT*******")
