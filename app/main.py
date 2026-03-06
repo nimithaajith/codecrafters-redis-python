@@ -49,21 +49,26 @@ data_store={}
 async def blocked_client_handler():
     print("############blocked_client_handler#############")
     while True:
+        
         if data_store:
             for key in data_store:
                 if data_store[key].blocked_clients:
                     blocked_clients=data_store[key].blocked_clients
-                    
-                    for client_tuple in blocked_clients:
-                        _,expires_on,_=client_tuple
-                        if datetime.now(timezone.utc) >= expires_on:
-                            blocked_clients.remove(client_tuple)
-                            print("******REMOVED BLPOP CLIENT*******")
-                            # response='*-1\r\n'
-                            # client_writer.write(response.encode())
-                            # await client_writer.drain()
+                    try:
+                        for client_tuple in blocked_clients:
+                            try:
+                                _,expires_on,_=client_tuple
+                                if datetime.now(timezone.utc) >= expires_on:
+                                    data_store[key].blocked_clients.remove(client_tuple)
+                                    print("******REMOVED BLPOP CLIENT*******")
+                                    # response='*-1\r\n'
+                                    # client_writer.write(response.encode())
+                                    # await client_writer.drain()
+                            except:
+                                pass 
+                    except:
+                        pass                   
                         
-                    data_store[key].blocked_clients=blocked_clients
 
         await asyncio.sleep(0.5)   # check twice per second
                     
