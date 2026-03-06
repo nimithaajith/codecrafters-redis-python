@@ -399,7 +399,7 @@ async def client_handler(reader,writer):
                     await writer.drain()
                 elif data_list[0] == 'BLPOP': 
                     key=data_list[1] 
-                    waits_for=int(data_list[2]) # in seconds, 0 for infinite
+                    waits_for=float(data_list[2]) # in seconds, 0 for infinite
                     if key in data_store:
                         redis_obj=data_store[key]
                         if redis_obj.data:
