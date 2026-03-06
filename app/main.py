@@ -89,7 +89,7 @@ async def get_blpop_response(client_tuple) :
             else:
                 await asyncio.sleep(0.01)
         else:
-            response = '$-1\r\n'
+            response = '*-1\r\n'
             return response  
 
 
