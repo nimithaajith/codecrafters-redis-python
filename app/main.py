@@ -297,7 +297,7 @@ async def client_handler(reader,writer):
                     if len(token)>1 and token.startswith('*'):
                         
                         continue
-                    if token.startswith('$'):
+                    if token.startswith('$') and token.strip() != '$':
                         continue
                     data_list.append(token.strip())
                 if data_list[0] == 'ECHO':
@@ -608,11 +608,14 @@ async def client_handler(reader,writer):
                         if key in data_store:
                             response=f'*1\r\n'
                             redis_obj =data_store[key]
-                            key_response,data_len=get_xread_response(key,redis_obj,stream_key)
-                            if data_len > 0:
-                                print('$$$$$$data_list[2]=',data_list[2],' ; got response =',key_response)
-                                response = response + key_response 
-                                xread_stream_block=False
+                            if stream_key != '$':
+                                key_response,data_len=get_xread_response(key,redis_obj,stream_key)
+                                if data_len > 0:
+                                    print('$$$$$$data_list[2]=',data_list[2],' ; got response =',key_response)
+                                    response = response + key_response 
+                                    xread_stream_block=False
+                            else:
+                                stream_key=redis_obj.last_key
                         if xread_stream_block:
                             #push to waiting queue and wait
                             if data_list[2].strip() == '0':
