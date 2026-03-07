@@ -232,7 +232,7 @@ def get_xread_response(key,redis_obj,start):
     print("xread result length =",n1)
     
 
-    result_str=f'*1\r\n*2\r\n${len(key)}\r\n{key}\r\n*{n1}\r\n'  
+    result_str=f'*2\r\n${len(key)}\r\n{key}\r\n*{n1}\r\n'  
     for length,obj in result:
         #appending each entry object of the stream and number of key-value pairs
         result_str=result_str+f'*2\r\n${len(obj.id)}\r\n{obj.id}\r\n*{length*2}\r\n' 
@@ -565,15 +565,26 @@ async def client_handler(reader,writer):
                     await writer.drain() 
                 elif data_list[0] == 'XREAD': 
                     if data_list[1].upper() == 'STREAMS':
-                        key=data_list[2]
-                        stream_key = data_list[3]
-                        response=''
-                        if key in data_store.keys():
-                            print(">>>>>xread Key found<<<<")
-                            redis_obj = data_store[key]
-                            response=get_xread_response(key,redis_obj,stream_key)
-                            print(">>>>RESPONSE<<<<<")
-                            print(response)
+                        xread_list=data_list[2:]
+                        #keys of streams to be read from data_store
+                        no_of_keys=int(len(xread_list)//2)
+                        xread_dict={}
+                        for i in range(no_of_keys):
+                            xread_dict[xread_list[i]] =xread_list[i+no_of_keys]
+                        if xread_dict:
+                            response=f'*{no_of_keys}\r\n'
+                        for key,stream_key in xread_dict.items():
+                            # key=data_list[2]
+                            # stream_key = data_list[3]
+                            # response=''
+                            print(">>>>>xread Key found<<<<",key,stream_key)
+                            key_response=''
+                            redis_obj=None
+                            if key in data_store.keys():                                
+                                redis_obj = data_store[key]
+                                key_response=get_xread_response(key,redis_obj,stream_key)
+                                response = response + key_response                                
+                                
                     # print(">>>>RESPONSE<<<<<")
                     # print(response)
                     writer.write(response.encode()) 
