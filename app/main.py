@@ -239,6 +239,7 @@ def get_xread_response(key,redis_obj,start):
         for k,v in obj.entry.items():
             # appending key-value pairs of the stream entry
             result_str=result_str+f'${len(k)}\r\n{k}\r\n${len(v)}\r\n{v}\r\n'
+    print("RESULT = "),result_str
     return result_str
         
 
@@ -568,10 +569,13 @@ async def client_handler(reader,writer):
                         stream_key = data_list[3]
                         response=''
                         if key in data_store.keys():
+                            print(">>>>>xread Key found<<<<")
                             redis_obj = data_store[key]
                             response=get_xread_response(key,redis_obj,stream_key)
-                    print(">>>>RESPONSE<<<<<")
-                    print(response)
+                            print(">>>>RESPONSE<<<<<")
+                            print(response)
+                    # print(">>>>RESPONSE<<<<<")
+                    # print(response)
                     writer.write(response.encode()) 
                     await writer.drain() 
 
