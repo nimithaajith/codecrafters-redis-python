@@ -220,7 +220,7 @@ def get_xrange_response(redis_obj,start,end):
     return result_str   
 
 def get_xread_response(redis_obj,start):
-    print('XREAD STARTED>>>>>>>')
+    #XREAD 
     result=[]
     for stream_obj in redis_obj.data:
         l=0
@@ -229,7 +229,7 @@ def get_xread_response(redis_obj,start):
                 result.append((l,stream_obj))  
         
     n1 = len(result)
-    print("result length =",n1)
+    print("xread result length =",n1)
     result_str=f'*{n1}\r\n'  
     for length,obj in result:
         #appending each entry object of the stream and number of key-value pairs
