@@ -508,7 +508,6 @@ async def client_handler(reader,writer):
                 elif data_list[0] == 'XADD': 
                     key=data_list[1]
                     stream_key = data_list[2]
-                    print('key =',key,' stream key =',stream_key)                    
                     # XADD key 0-1 foo bar
                     #<millisecondsTime>-<sequenceNumber>
                     AddStream = True
@@ -557,15 +556,10 @@ async def client_handler(reader,writer):
                         while i<len(stream_entry_data):                        
                             l.append([stream_entry_data[i],stream_entry_data[i+1]])
                             i += 2
-                        print('l =',l)
-                        print('new_stream_entry =',new_stream_entry.id, new_stream_entry.entry)
-                        new_stream_entry.add_entry(l)
-                        print('new_stream_entry =',new_stream_entry.id, new_stream_entry.entry)
-                    
+                        new_stream_entry.add_entry(l)                       
                     
                         redis_obj.data.append(new_stream_entry)
-                        print('redis obj data')
-                        print(redis_obj.data)
+                        
                         response=f'${len(stream_key)}\r\n{stream_key}\r\n'  
                     else:
                         response = message
@@ -616,11 +610,13 @@ async def client_handler(reader,writer):
                             redis_obj =data_store[key]
                             key_response,data_len=get_xread_response(key,redis_obj,stream_key)
                             if data_len > 0:
+                                print('$$$$$$data_list[2]=',data_list[2],' ; got response =',key_response)
                                 response = response + key_response 
                                 xread_stream_block=False
                         if xread_stream_block:
                             #push to waiting queue and wait
-                            if data_list[2].strip == '0':
+                            if data_list[2].strip() == '0':
+                                print("####INFINITE WAIT#####",client_addr)
                                 expires_on= datetime.max.replace(tzinfo=timezone.utc) # set to infinite datetime
                             else:
                                 expires_on = datetime.now(timezone.utc)+timedelta(milliseconds=block_ms)
