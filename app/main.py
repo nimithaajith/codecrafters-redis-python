@@ -230,9 +230,9 @@ def get_xread_response(key,redis_obj,start):
         
     n1 = len(result)
     print("xread result length =",n1)
-    f'*1\r\n*2\r\n${len(key)}\r\n{key}\r\n'
+    
 
-    result_str=f'*{n1}\r\n'  
+    result_str=f'*1\r\n*2\r\n${len(key)}\r\n{key}\r\n*{n1}\r\n'  
     for length,obj in result:
         #appending each entry object of the stream and number of key-value pairs
         result_str=result_str+f'*2\r\n${len(obj.id)}\r\n{obj.id}\r\n*{length*2}\r\n' 
