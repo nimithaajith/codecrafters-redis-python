@@ -230,8 +230,7 @@ def get_xread_response(key,redis_obj,start):
                 result.append((l,stream_obj))  
         
     n1 = len(result)
-    print("xread result length =",n1)
-    
+    print("xread result length =",n1)   
 
     result_str=f'*2\r\n${len(key)}\r\n{key}\r\n*{n1}\r\n'  
     for length,obj in result:
@@ -240,7 +239,7 @@ def get_xread_response(key,redis_obj,start):
         for k,v in obj.entry.items():
             # appending key-value pairs of the stream entry
             result_str=result_str+f'${len(k)}\r\n{k}\r\n${len(v)}\r\n{v}\r\n'
-    print("RESULT = "),result_str
+    print("RESULT = ",result_str)
     return result_str,n1
         
 
@@ -264,11 +263,11 @@ async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
             if client_details_list[0] == client_addr :
                 redis_obj=data_store[key]
                 if redis_obj.data:
-                    xread_stream_block_que[key].pop(0)
                     response,n1= get_xread_response(key,redis_obj,stream_key)
                     
                     if n1 >0:
                         print('>>>>BLOCK SERVED<<<')
+                        xread_stream_block_que[key].pop(0)                    
                         return response,False
                     
         await asyncio.sleep(0.0001)
