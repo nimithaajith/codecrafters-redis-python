@@ -255,7 +255,7 @@ async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
         print('>>>>BLOCK LOOP iteration<<<')
     #return response,expired
         if datetime.now(timezone.utc) >= expires_on :
-            xread_stream_block_que[key].pop(0)
+            xread_stream_block_que[key].remove(client_addr)
             print('>>>>BLOCK EXPIRED<<<')
             return  f'*-1\r\n',True
         else:
@@ -263,11 +263,12 @@ async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
             if client_addr in client_details_list:
                 redis_obj=data_store[key]
                 if redis_obj.data:
-                    response,n1= get_xread_response(key,redis_obj,stream_key)                    
-                    if n1 >0:
-                        xread_stream_block_que[key].pop(0)                    
-                        return response,False                    
-        await asyncio.sleep(0.0001)
+                    for stream_obj in redis_obj.data:       
+                        if stream_obj.id > stream_key:                        
+                            response,n1= get_xread_response(key,redis_obj,stream_key)                    
+                            xread_stream_block_que[key].remove(client_addr)                   
+                            return response,False                    
+        await asyncio.sleep(0.01)
 
 
 
