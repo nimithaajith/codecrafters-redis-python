@@ -2,7 +2,7 @@ import asyncio
 from datetime import timezone,timedelta,datetime
 import time
 import threading
-from collections import deque
+from collections import deque,defaultdict
 
 
 
@@ -45,6 +45,7 @@ class StreamEntry():
         print("******Add entry finished*******")
 
 data_store={}
+xread_stream_block_que=defaultdict(list)
 
 async def blocked_client_handler():
     print("############blocked_client_handler#############")
@@ -240,7 +241,7 @@ def get_xread_response(key,redis_obj,start):
             # appending key-value pairs of the stream entry
             result_str=result_str+f'${len(k)}\r\n{k}\r\n${len(v)}\r\n{v}\r\n'
     print("RESULT = "),result_str
-    return result_str
+    return result_str,n1
         
 
 async def get_data_type(val):
@@ -249,9 +250,35 @@ async def get_data_type(val):
     else:
         None
 
+
+async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
+    while True:
+        print('>>>>BLOCK handler started<<<')
+    #return response,expired
+        if datetime.now(timezone.utc) >= expires_on :
+            xread_stream_block_que[key].pop(0)
+            print('>>>>BLOCK EXPIRED<<<')
+            return  f'*-1\r\n',True
+        else:
+            client_details_list=xread_stream_block_que[key]
+            if client_details_list[0] == client_addr :
+                redis_obj=data_store[key]
+                if redis_obj.data:
+                    xread_stream_block_que[key].pop(0)
+                    response,n1= get_xread_response(key,redis_obj,stream_key)
+                    
+                    if n1 >0:
+                        print('>>>>BLOCK SERVED<<<')
+                        return response,False
+                    
+        await asyncio.sleep(0.0001)
+
+
+
 async def client_handler(reader,writer):
     try:
-        print("Connected...")        
+        print("Connected...") 
+        client_addr = writer.get_extra_info('peername')       
         CONNECT = True
         while CONNECT:
             input_query=await reader.read(1024)
@@ -582,11 +609,33 @@ async def client_handler(reader,writer):
                             redis_obj=None
                             if key in data_store.keys():                                
                                 redis_obj = data_store[key]
-                                key_response=get_xread_response(key,redis_obj,stream_key)
+                                key_response,_=get_xread_response(key,redis_obj,stream_key)
                                 response = response + key_response                                
-                                
-                    # print(">>>>RESPONSE<<<<<")
-                    # print(response)
+                    elif data_list[1].upper() == 'BLOCK' and data_list[3].upper() == 'STREAMS':
+                        block_ms=float(data_list[2])
+                        key=data_list[4] 
+                        stream_key=data_list[5] 
+                        xread_stream_block=True
+                        if key in data_store:
+                            response=f'*1\r\n'
+                            redis_obj =data_store[key]
+                            key_response,data_len=get_xread_response(key,redis_obj,stream_key)
+                            if data_len > 0:
+                                response = response + key_response 
+                                xread_stream_block=False
+                        if xread_stream_block:
+                            #push to waiting queue and wait
+                            expires_on = datetime.now(timezone.utc)+timedelta(milliseconds=block_ms)
+                            xread_stream_block_que[key].append(client_addr)
+                            block_response,block_expired=await xread_stream_block_handler(key,stream_key,expires_on,client_addr)
+                            if not block_expired:
+                                response=f'*1\r\n'+block_response
+                            else:
+                                response=block_response               
+
+                                      
+                    print(">>>>RESPONSE<<<<<")
+                    print(response)
                     writer.write(response.encode()) 
                     await writer.drain() 
 
