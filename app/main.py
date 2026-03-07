@@ -564,7 +564,7 @@ async def client_handler(reader,writer):
                     writer.write(response.encode()) 
                     await writer.drain() 
                 elif data_list[0] == 'XREAD': 
-                    if data_list[1] == 'STREAMS':
+                    if data_list[1].upper() == 'STREAMS':
                         key=data_list[2]
                         stream_key = data_list[3]
                         response=''
