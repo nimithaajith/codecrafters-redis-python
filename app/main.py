@@ -219,7 +219,7 @@ def get_xrange_response(redis_obj,start,end):
     print('XRANGE COMPLETED>>>>>>>')
     return result_str   
 
-def get_xread_response(redis_obj,start):
+def get_xread_response(key,redis_obj,start):
     #XREAD 
     result=[]
     for stream_obj in redis_obj.data:
@@ -230,6 +230,8 @@ def get_xread_response(redis_obj,start):
         
     n1 = len(result)
     print("xread result length =",n1)
+    f'*1\r\n*2\r\n${len(key)}\r\n{key}\r\n'
+
     result_str=f'*{n1}\r\n'  
     for length,obj in result:
         #appending each entry object of the stream and number of key-value pairs
@@ -567,7 +569,7 @@ async def client_handler(reader,writer):
                         response=''
                         if key in data_store.keys():
                             redis_obj = data_store[key]
-                            response=get_xread_response(redis_obj,stream_key)
+                            response=get_xread_response(key,redis_obj,stream_key)
                     print(">>>>RESPONSE<<<<<")
                     print(response)
                     writer.write(response.encode()) 
