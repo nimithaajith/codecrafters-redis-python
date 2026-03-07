@@ -251,12 +251,10 @@ async def get_data_type(val):
 
 
 async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
-    while True:
-        print('>>>>BLOCK LOOP iteration<<<')
-    #return response,expired
+    while True:        
+        #return response,expired
         if datetime.now(timezone.utc) >= expires_on :
             xread_stream_block_que[key].remove(client_addr)
-            print('>>>>BLOCK EXPIRED<<<')
             return  f'*-1\r\n',True
         else:
             client_details_list=xread_stream_block_que[key]
@@ -622,7 +620,10 @@ async def client_handler(reader,writer):
                                 xread_stream_block=False
                         if xread_stream_block:
                             #push to waiting queue and wait
-                            expires_on = datetime.now(timezone.utc)+timedelta(milliseconds=block_ms)
+                            if data_list[2].strip == '0':
+                                expires_on= datetime.max.replace(tzinfo=timezone.utc) # set to infinite datetime
+                            else:
+                                expires_on = datetime.now(timezone.utc)+timedelta(milliseconds=block_ms)
                             xread_stream_block_que[key].append(client_addr)
                             block_response,block_expired=await xread_stream_block_handler(key,stream_key,expires_on,client_addr)
                             if not block_expired:
