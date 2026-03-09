@@ -337,10 +337,12 @@ async def client_handler(reader,writer):
                             new_val = str(int(redis_obj.data)+1)
                             redis_obj.data = new_val
                             response =f':{new_val}\r\n'
+                    else:
+                        data_store[key] = RedisObject(data = str(1),data_type='string') 
+                        response =f':{str(1)}\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
-                    print('###RESPONSE###')
-                    print(response)
+                    
                 elif data_list[0] == 'GET': 
                     key=data_list[1]
                     if key in data_store.keys() :
