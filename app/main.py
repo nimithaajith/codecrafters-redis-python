@@ -328,6 +328,16 @@ async def client_handler(reader,writer):
                     await writer.drain() 
                     print('###RESPONSE###')
                     print(response)
+                elif data_list[0] == 'INCR': 
+                    key =data_list[1]
+                    if data_store[key].isdigit():
+                        new_val = int(data_store[key])+1
+                        data_store[key] = new_val
+                    response =f':{new_val}\r\n'
+                    writer.write(response.encode())
+                    await writer.drain() 
+                    print('###RESPONSE###')
+                    print(response)
                 elif data_list[0] == 'GET': 
                     key=data_list[1]
                     if key in data_store.keys() :
