@@ -334,8 +334,8 @@ async def client_handler(reader,writer):
                     if data_store[key]:
                         redis_obj=data_store[key]
                         if redis_obj.data.isdigit():
-                            new_val = int(data_store[key])+1
-                            data_store[key] = new_val
+                            new_val = str(int(redis_obj.data)+1)
+                            redis_obj.data = new_val
                             response =f':{new_val}\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
