@@ -331,16 +331,15 @@ async def client_handler(reader,writer):
                 elif data_list[0] == 'INCR': 
                     key =data_list[1]
                     response=None
-                    print("incr key  :",key)
                     if key in data_store:
-                        print("incr key exists in datastore :",key)
                         redis_obj=data_store[key]
                         if redis_obj.data.isdigit():
                             new_val = str(int(redis_obj.data)+1)
                             redis_obj.data = new_val
                             response =f':{new_val}\r\n'
+                        else:
+                            response="-ERR value is not an integer or out of range\r\n"
                     else:
-                        print("key not found in incr :",key)
                         data_store[key] = RedisObject(data = '1',data_type='string') 
                         response =f':1\r\n'
                     writer.write(response.encode())
