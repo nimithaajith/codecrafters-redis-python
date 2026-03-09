@@ -330,10 +330,13 @@ async def client_handler(reader,writer):
                     print(response)
                 elif data_list[0] == 'INCR': 
                     key =data_list[1]
-                    if data_store[key].isdigit():
-                        new_val = int(data_store[key])+1
-                        data_store[key] = new_val
-                    response =f':{new_val}\r\n'
+                    response=None
+                    if data_store[key]:
+                        redis_obj=data_store[key]
+                        if redis_obj.data.isdigit():
+                            new_val = int(data_store[key])+1
+                            data_store[key] = new_val
+                            response =f':{new_val}\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
                     print('###RESPONSE###')
