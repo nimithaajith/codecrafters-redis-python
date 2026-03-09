@@ -332,13 +332,16 @@ async def client_handler(reader,writer):
                     key =data_list[1]
                     response=None
                     if data_store[key]:
+                        print("incr key exists in datastore :",key)
                         redis_obj=data_store[key]
                         if redis_obj.data.isdigit():
                             new_val = str(int(redis_obj.data)+1)
                             redis_obj.data = new_val
                             response =f':{new_val}\r\n'
                     else:
+                        print("key not found in incr :",key)
                         data_store[key] = RedisObject(data = str(1),data_type='string') 
+                        print("redis object data :",data_store[key])
                         response =f':{str(1)}\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
