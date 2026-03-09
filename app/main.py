@@ -332,7 +332,7 @@ async def client_handler(reader,writer):
                     key =data_list[1]
                     response=None
                     print("incr key  :",key)
-                    if data_store[key]:
+                    if key in data_store:
                         print("incr key exists in datastore :",key)
                         redis_obj=data_store[key]
                         if redis_obj.data.isdigit():
@@ -341,8 +341,7 @@ async def client_handler(reader,writer):
                             response =f':{new_val}\r\n'
                     else:
                         print("key not found in incr :",key)
-                        data_store[key] = RedisObject(data = str(1),data_type='string') 
-                        print("redis object data :",data_store[key].data)
+                        data_store[key] = RedisObject(data = '1',data_type='string') 
                         response =f':1\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
