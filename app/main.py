@@ -704,7 +704,7 @@ async def client_handler(reader,writer):
                         print('status = multi enabled,not EXEC')
                         MULTI[1].append(query_string)
                         response=f"+QUEUED\r\n"
-                    writer.write(response)
+                    writer.write(response.encode())
                     await writer.drain() 
                     continue 
             else:
