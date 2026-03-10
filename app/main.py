@@ -275,6 +275,7 @@ async def client_handler(reader,writer):
         print("Connected...") 
         client_addr = writer.get_extra_info('peername')       
         CONNECT = True
+        # multi command enabled, queue to hold upcoming commands
         MULTI=[False,deque()]
         while CONNECT:
             input_query=await reader.read(1024)
@@ -283,11 +284,18 @@ async def client_handler(reader,writer):
                 continue
             query_string=str(input_query.decode()) 
             print('RECEIVED = ',query_string)
+            input_tokens=query_string.splitlines()
             if MULTI[0] :
-                MULTI[1].append(query_string)
-                response=b"+QUEUED\r\n"
-                writer.write(response)
-                await writer.drain() 
+                if len(MULTI[1]) ==0 and input_tokens[2].strip().upper() == 'EXEC':
+                    response=f'*0\r\n'
+                    MULTI[0] = False
+                    writer.write(response.encode())
+                    await writer.drain()
+                else:
+                    MULTI[1].append(query_string)
+                    response=b"+QUEUED\r\n"
+                    writer.write(response)
+                    await writer.drain() 
                 continue
             if not query_string.startswith("*"):
                 await asyncio.sleep(0.2)
@@ -311,12 +319,12 @@ async def client_handler(reader,writer):
                         response=b'-ERR EXEC without MULTI\r\n' 
                         writer.write(response)
                         await writer.drain() 
-                    elif MULTI[0] and len(MULTI[1]) == 0:
-                        print(">>>>>>INSIDE EXEC SOON AFTER $$$$$$$")
-                        response=f'*0\r\n'
-                        MULTI[0] = False
-                        writer.write(response.encode())
-                        await writer.drain()
+                    # elif MULTI[0] and len(MULTI[1]) == 0:
+                    #     print(">>>>>>INSIDE EXEC SOON AFTER $$$$$$$")
+                    #     response=f'*0\r\n'
+                    #     MULTI[0] = False
+                    #     writer.write(response.encode())
+                    #     await writer.drain()
                     continue
             elif no_of_elements > 1:
                 for token in input_tokens:
