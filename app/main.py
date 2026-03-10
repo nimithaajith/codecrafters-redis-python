@@ -688,7 +688,7 @@ async def client_handler(reader,writer):
                             query_string=MULTI[1].popleft()
                             input_tokens=query_string.splitlines()
                             cmd_response = await command_handler(writer,client_addr,MULTI,query_string,input_tokens)
-                            response = response+ f'${len(cmd_response)}\r\n{cmd_response}\r\n'
+                            response = response+ f'{cmd_response}\r\n'
                         writer.write(response.encode())
                         print("$$$$$$RESPONSE::::",response)
                         await writer.drain() 
