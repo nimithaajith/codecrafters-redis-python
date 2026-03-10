@@ -311,10 +311,11 @@ async def client_handler(reader,writer):
                         response=b'-ERR EXEC without MULTI\r\n' 
                         writer.write(response)
                         await writer.drain() 
-                    elif MULTI[0]  and not MULTI[1]:
-                        response=b'*0\r\n'
+                    elif MULTI[0] and len(MULTI[1]) == 0:
+                        print(">>>>>>INSIDE EXEC SOON AFTER $$$$$$$")
+                        response=f'*0\r\n'
                         MULTI[0] = False
-                        writer.write(response)
+                        writer.write(response.encode())
                         await writer.drain()
                     continue
             elif no_of_elements > 1:
