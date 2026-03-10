@@ -309,7 +309,12 @@ async def client_handler(reader,writer):
                     if not MULTI[0] :
                         response=b'-ERR EXEC without MULTI\r\n' 
                         writer.write(response)
-                        await writer.drain()   
+                        await writer.drain() 
+                    elif MULTI[0]  and not MULTI[1]:
+                        response=b'*0\r\n'
+                        MULTI[0] = False
+                        writer.write(response)
+                        await writer.drain()
                     continue
             elif no_of_elements > 1:
                 for token in input_tokens:
