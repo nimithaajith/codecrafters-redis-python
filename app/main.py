@@ -282,6 +282,7 @@ async def client_handler(reader,writer):
                 await asyncio.sleep(0.2)
                 continue
             query_string=str(input_query.decode()) 
+            print('RECEIVED = ',query_string)
             if MULTI[0] :
                 MULTI[1].append(query_string)
                 response=b"+QUEUED\r\n"
