@@ -275,23 +275,36 @@ async def client_handler(reader,writer):
         print("Connected...") 
         client_addr = writer.get_extra_info('peername')       
         CONNECT = True
+        MULTI=[False,deque()]
         while CONNECT:
             input_query=await reader.read(1024)
             if not input_query:
                 await asyncio.sleep(0.2)
                 continue
             query_string=str(input_query.decode()) 
+            if MULTI[0] :
+                MULTI[1].append(query_string)
+                response=b"+QUEUED\r\n"
+                writer.write(response)
+                await writer.drain() 
+                continue
             if not query_string.startswith("*"):
                 await asyncio.sleep(0.2)
                 continue
             input_tokens=query_string.splitlines()
             no_of_elements=int(input_tokens[0].lstrip('*'))               
             data_list=[]
+
             if no_of_elements == 1:
                 if input_tokens[2] == 'PING':
                     response=b"+PONG\r\n"
                     writer.write(response)
-                    await writer.drain()                    
+                    await writer.drain()  
+                elif input_tokens[2].upper() == 'MULTI' : 
+                    MULTI[0]  = True
+                    response ='+OK\r\n'
+                    writer.write(response)
+                    await writer.drain()         
             elif no_of_elements > 1:
                 for token in input_tokens:
                     if len(token)>1 and token.startswith('*'):
