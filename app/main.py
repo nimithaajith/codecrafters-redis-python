@@ -302,7 +302,7 @@ async def client_handler(reader,writer):
                     await writer.drain()  
                 elif input_tokens[2].upper() == 'MULTI' : 
                     MULTI[0]  = True
-                    response ='+OK\r\n'
+                    response =b'+OK\r\n'
                     writer.write(response)
                     await writer.drain()         
             elif no_of_elements > 1:
