@@ -275,9 +275,9 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
 
     if no_of_elements == 1:
         if input_tokens[2] == 'PING':
-            response=b"+PONG\r\n"
-            writer.write(response)
-            await writer.drain()  
+            response=f"+PONG\r\n"
+            # writer.write(response)
+            # await writer.drain()  
             
     elif no_of_elements > 1:
         for token in input_tokens:
@@ -293,10 +293,10 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
                 echo_data = data_list[1]
             string_length=len(echo_data)
             response=f"${string_length}\r\n{echo_data}\r\n"  
-            writer.write(response.encode())
-            await writer.drain() 
-            print('###RESPONSE###')
-            print(response)
+            # writer.write(response.encode())
+            # await writer.drain() 
+            # print('###RESPONSE###')
+            # print(response)
         elif data_list[0] == 'SET':
             key=data_list[1]
             val=data_list[2]
@@ -310,8 +310,8 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
                 
             data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
             response=f"+OK\r\n"  
-            writer.write(response.encode())
-            await writer.drain()             
+            # writer.write(response.encode())
+            # await writer.drain()             
         elif data_list[0] == 'INCR': 
             key =data_list[1]
             response=None
@@ -326,8 +326,8 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
             else:
                 data_store[key] = RedisObject(data = '1',data_type='string') 
                 response =f':1\r\n'
-            writer.write(response.encode())
-            await writer.drain() 
+            # writer.write(response.encode())
+            # await writer.drain() 
             
         elif data_list[0] == 'GET': 
             key=data_list[1]
@@ -342,10 +342,10 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
                     
             else:
                 response=f"$-1\r\n"
-            writer.write(response.encode())
-            await writer.drain()
-            print('###RESPONSE###')
-            print(response) 
+            # writer.write(response.encode())
+            # await writer.drain()
+            # print('###RESPONSE###')
+            # print(response) 
         elif data_list[0] == 'LPUSH': 
             key=data_list[1] 
             new_data_list=data_list[2:]
@@ -359,8 +359,8 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
             if redis_obj.blocked_clients and redis_obj.data:
                 pass                    
             response=f':{n}\r\n'
-            writer.write(response.encode())
-            await writer.drain()                                                          
+            # writer.write(response.encode())
+            # await writer.drain()                                                          
                 
         elif data_list[0] == 'RPUSH': 
             key=data_list[1] 
@@ -376,8 +376,8 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
             if redis_obj.blocked_clients and redis_obj.data:
                 pass
             response=f':{n}\r\n'
-            writer.write(response.encode())
-            await writer.drain()                    
+            # writer.write(response.encode())
+            # await writer.drain()                    
         elif data_list[0] == 'LRANGE': 
             key=data_list[1] 
             start_index=int(data_list[2].strip())
@@ -411,10 +411,10 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
                 length=len(result_list)
                 response=f'*{length}\r\n'+'\r\n'.join(f'${len(item)}\r\n{item}' for item in result_list)+f'\r\n'
             
-            print('>>>RESPONSE>>>>') 
-            print(response)                    
-            writer.write(response.encode())
-            await writer.drain()
+            # print('>>>RESPONSE>>>>') 
+            # print(response)                    
+            # writer.write(response.encode())
+            # await writer.drain()
         elif data_list[0] == 'LLEN': 
             key=data_list[1] 
             length=0
@@ -424,10 +424,10 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
                 response=f':{length}\r\n'                    
             else:
                 response=f':0\r\n'
-            print('###RESPONSE###')
-            print(response)
-            writer.write(response.encode())
-            await writer.drain()
+            # print('###RESPONSE###')
+            # print(response)
+            # writer.write(response.encode())
+            # await writer.drain()
         elif data_list[0] == 'BLPOP': 
             key=data_list[1] 
             waits_for=float(data_list[2]) # in seconds, 0 for infinite
@@ -440,8 +440,8 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
                     response=f'*2\r\n${len(key)}\r\n{key}\r\n${length}\r\n{ele}\r\n' 
                     print('###RESPONSE TO BLPOP CLIENT###')
                     print(response)
-                    writer.write(response.encode())
-                    await writer.drain() 
+                    # writer.write(response.encode())
+                    # await writer.drain() 
                 else:
                     # if data is not available add to blocked clients
                     if waits_for == 0:
@@ -471,9 +471,9 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
             if not writer.is_closing():
                 print('###RESPONSE###')
                 print(response)
-                writer.write(response.encode())
-                await writer.drain()
-                print("send response>>>>>>>>>>>>>>")
+                # writer.write(response.encode())
+                # await writer.drain()
+                # print("send response>>>>>>>>>>>>>>")
         elif data_list[0] == 'LPOP': 
             key=data_list[1] 
             length=0
@@ -502,10 +502,10 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
                                                             
             if length == 0:
                 response=f'$-1\r\n'
-            print('###RESPONSE###')
-            print(response)
-            writer.write(response.encode())
-            await writer.drain()
+            # print('###RESPONSE###')
+            # print(response)
+            # writer.write(response.encode())
+            # await writer.drain()
         elif data_list[0] == 'XADD': 
             key=data_list[1]
             stream_key = data_list[2]
@@ -564,8 +564,8 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
                 response=f'${len(stream_key)}\r\n{stream_key}\r\n'  
             else:
                 response = message
-            writer.write(response.encode())
-            await writer.drain() 
+            # writer.write(response.encode())
+            # await writer.drain() 
         elif data_list[0] == 'XRANGE': 
             key=data_list[1] 
             response=''
@@ -578,8 +578,8 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
                 response=get_xrange_response(redis_obj,start,stop)
                 print("start-end:::",start,stop)
                 print(response)
-            writer.write(response.encode()) 
-            await writer.drain() 
+            # writer.write(response.encode()) 
+            # await writer.drain() 
         elif data_list[0] == 'XREAD': 
             if data_list[1].upper() == 'STREAMS':
                 xread_list=data_list[2:]
@@ -634,8 +634,8 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
                                 
             print(">>>>RESPONSE<<<<<")
             print(response)
-            writer.write(response.encode()) 
-            await writer.drain() 
+            # writer.write(response.encode()) 
+            # await writer.drain() 
 
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
@@ -644,8 +644,9 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
                 response=f'+{data_type}\r\n'
             else:
                 response=f'+none\r\n'
-            writer.write(response.encode())
-            await writer.drain()                                           
+            # writer.write(response.encode())
+            # await writer.drain()  
+    return response                                         
     
 
 async def client_handler(reader,writer):
@@ -683,7 +684,9 @@ async def client_handler(reader,writer):
                         while len(MULTI[1]) > 0 :
                             query_string=MULTI[1].popleft()
                             input_tokens=query_string.splitlines()
-                            await command_handler(writer,client_addr,MULTI,query_string,input_tokens)
+                            response = await command_handler(writer,client_addr,MULTI,query_string,input_tokens)
+                            writer.write(response.encode())
+                            await writer.drain() 
                             print("<<<<<command handler completed>>>>>")
                         MULTI[0]=False
                         continue
@@ -707,7 +710,9 @@ async def client_handler(reader,writer):
                 await asyncio.sleep(0.2)
                 continue
             print("Calling command handler main")
-            await command_handler(writer,client_addr,MULTI,query_string,input_tokens)
+            response = await command_handler(writer,client_addr,MULTI,query_string,input_tokens)
+            writer.write(response.encode())
+            await writer.drain() 
             if not CONNECT:
                 break
                 
