@@ -682,11 +682,10 @@ async def client_handler(reader,writer):
                         await writer.drain()
                         continue
                     else:
-                        print(">>>>>>INSIDE EXEC QUE EXECUTION $$$$$$$")
                         while len(MULTI[1]) > 0 :
                             query_string=MULTI[1].popleft()
                             input_tokens=query_string.splitlines()
-                            print("Calling command handler for queue")
+                            print('queued query_string = ',query_string)
                             await command_handler(writer,client_addr,MULTI,query_string,input_tokens)
                         MULTI[0]=False
                         continue
