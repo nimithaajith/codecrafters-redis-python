@@ -304,7 +304,13 @@ async def client_handler(reader,writer):
                     MULTI[0]  = True
                     response =b'+OK\r\n'
                     writer.write(response)
-                    await writer.drain()         
+                    await writer.drain() 
+                elif input_tokens[2].upper() == 'EXEC' :
+                    if not MULTI[0] :
+                        response=b'-ERR EXEC without MULTI\r\n' 
+                        writer.write(response)
+                        await writer.drain()   
+                    continue
             elif no_of_elements > 1:
                 for token in input_tokens:
                     if len(token)>1 and token.startswith('*'):
