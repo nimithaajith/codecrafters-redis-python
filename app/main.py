@@ -681,15 +681,17 @@ async def client_handler(reader,writer):
                         await writer.drain()
                         continue
                     else:
+                        que_length=len(MULTI[1])
+                        response =f'*{que_length}\r\n'
                         while len(MULTI[1]) > 0 :
+                            
                             query_string=MULTI[1].popleft()
                             input_tokens=query_string.splitlines()
-                            response = await command_handler(writer,client_addr,MULTI,query_string,input_tokens)
-                            
-                            writer.write(response.encode())
-                            print("$$$$$$RESPONSE::::",response)
-                            await writer.drain() 
-                            print("<<<<<command handler completed>>>>>")
+                            cmd_response = await command_handler(writer,client_addr,MULTI,query_string,input_tokens)
+                            response = response+ f'${len(cmd_response)}\r\n{cmd_response}\r\n'
+                        writer.write(response.encode())
+                        print("$$$$$$RESPONSE::::",response)
+                        await writer.drain() 
                         MULTI[0]=False
                         continue
 
