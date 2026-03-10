@@ -696,15 +696,25 @@ async def client_handler(reader,writer):
                         continue
 
                 else:
-                    print('status = multi enabled,not EXEC')
-                    MULTI[1].append(query_string)
-                    response=b"+QUEUED\r\n"
+                    if input_tokens[2].upper() == 'DISCARD' : 
+                        MULTI[0]=False
+                        MULTI[1]=deque()
+                        response=f"+OK\r\n"
+                    else:
+                        print('status = multi enabled,not EXEC')
+                        MULTI[1].append(query_string)
+                        response=f"+QUEUED\r\n"
                     writer.write(response)
                     await writer.drain() 
                     continue 
             else:
                 if input_tokens[2].upper() == 'EXEC' :                
                     response=b'-ERR EXEC without MULTI\r\n' 
+                    writer.write(response)
+                    await writer.drain() 
+                    continue 
+                if input_tokens[2].upper() == 'DISCARD' :                
+                    response=b'-ERR DISCARD without MULTI\r\n' 
                     writer.write(response)
                     await writer.drain() 
                     continue  
