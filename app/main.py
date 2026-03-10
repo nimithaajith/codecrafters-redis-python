@@ -311,9 +311,7 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
             data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
             response=f"+OK\r\n"  
             writer.write(response.encode())
-            await writer.drain() 
-            print('###RESPONSE###')
-            print(response)
+            await writer.drain()             
         elif data_list[0] == 'INCR': 
             key =data_list[1]
             response=None
@@ -685,8 +683,8 @@ async def client_handler(reader,writer):
                         while len(MULTI[1]) > 0 :
                             query_string=MULTI[1].popleft()
                             input_tokens=query_string.splitlines()
-                            print('queued query_string = ',query_string)
                             await command_handler(writer,client_addr,MULTI,query_string,input_tokens)
+                            print("<<<<<command handler completed>>>>>")
                         MULTI[0]=False
                         continue
 
