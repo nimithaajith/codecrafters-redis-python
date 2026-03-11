@@ -737,16 +737,25 @@ async def client_handler(reader,writer):
 
 
 
-async def run_server():
+async def run_server(port_number):
     try:
-        redis_server=await asyncio.start_server(client_handler,host="localhost",port=6379)
+        redis_server=await asyncio.start_server(client_handler,host="localhost",port=port_number)
         print(f'Redis server listening {redis_server.sockets[0].getsockname()}')
         asyncio.create_task(blocked_client_handler())                    
         await redis_server.serve_forever()
     except Exception as e:
         print("Server execution failed : Error ->",str(e))
 
+import sys
 def main():
+    if '--port' in sys.argv:
+        try:
+            args=sys.argv
+            port_number=int(args[args.index('--port')+1])
+        except:
+            port_number=6379
+    else:
+        port_number=6379
     print("Execution starts here....!")
 
     # server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
@@ -755,7 +764,7 @@ def main():
     #     data = conn.recv(1024)
     #     conn.sendall(b"+PONG\r\n")
 
-    asyncio.run(run_server())
+    asyncio.run(run_server(port_number))
     
 
 
