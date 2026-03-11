@@ -771,14 +771,14 @@ def main():
         port_number=6379
     if '--replicaof' in sys.argv:
         try:
-            RedisAsyncServer.role='replica'
+            RedisAsyncServer.role='slave'
             args=sys.argv
             master_details=int(args[args.index('--replicaof')+1])
             print("master =",master_details)
             
         except:
             pass
-    print("Execution starts here....!role=",RedisAsyncServer.role)
+    print("Execution starts here....!role=",RedisAsyncServer.role, master_details)
 
     # server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
     # conn, _ =server_socket.accept() # wait for client        
