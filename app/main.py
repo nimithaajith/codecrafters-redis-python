@@ -671,7 +671,7 @@ async def client_handler(reader,writer):
             if 'info' in input_tokens or 'INFO' in input_tokens:
                 if 'replication' in input_tokens:
                     role=RedisAsyncServer.role
-                    response='$11\r\nrole:{role}\r\n'
+                    response=f'$11\r\nrole:{role}\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
                     continue 
