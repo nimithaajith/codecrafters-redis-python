@@ -682,7 +682,7 @@ async def client_handler(reader,writer):
                         sec3='master_repl_offset:'+str(RedisAsyncServer.master_repl_offset)
                         print('sec3 =',sec3)
                         master_resp=f'role:{role}\r\n{sec2}\r\n{sec3}\r\n'
-                        response = f'${len(master_resp)}\r\n' + master_resp
+                        response = f'${len(master_resp)}\r\n' + master_resp + f'\r\n'
                     else:
                         response=f'${length}\r\nrole:{role}\r\n'
                     print("RESPONSE = ", response)
