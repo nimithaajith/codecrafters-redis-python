@@ -681,7 +681,7 @@ async def client_handler(reader,writer):
                         print('sec2 =',sec2)
                         sec3='master_repl_offset:'+str(RedisAsyncServer.master_repl_offset)
                         print('sec3 =',sec3)
-                        master_resp=f'${len(sec2)}\r\n{sec2}\r\n{len(sec3)}\r\n{sec3}\r\n'
+                        master_resp=f'${len(sec2)}\r\n{sec2}\r\n${len(sec3)}\r\n{sec3}\r\n'
                         response = f'*3\r\n${length}\r\nrole:{role}\r\n' + master_resp
                     else:
                         response=f'${length}\r\nrole:{role}\r\n'
