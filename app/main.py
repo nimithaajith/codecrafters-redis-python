@@ -666,12 +666,13 @@ async def client_handler(reader,writer):
                 await asyncio.sleep(0.2)
                 continue
             query_string=str(input_query.decode()) 
-            print('RECEIVED = ',query_string)
+            # print('RECEIVED = ',query_string)
             input_tokens=query_string.splitlines()
             if 'info' in input_tokens or 'INFO' in input_tokens:
                 if 'replication' in input_tokens:
                     role=RedisAsyncServer.role
-                    response=f'$11\r\nrole:{role}\r\n'
+                    length=5+len(role)
+                    response=f'${length}\r\nrole:{role}\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
                     continue 
@@ -770,13 +771,14 @@ def main():
         port_number=6379
     if '--replicaof' in sys.argv:
         try:
+            RedisAsyncServer.role='replica'
             args=sys.argv
             master_details=int(args[args.index('--replicaof')+1])
             print("master =",master_details)
-            RedisAsyncServer.role='replica'
+            
         except:
             pass
-    print("Execution starts here....!")
+    print("Execution starts here....!role=",RedisAsyncServer.role)
 
     # server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
     # conn, _ =server_socket.accept() # wait for client        
