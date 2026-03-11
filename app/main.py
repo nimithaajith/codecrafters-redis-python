@@ -678,7 +678,9 @@ async def client_handler(reader,writer):
                     response=f'${length}\r\nrole:{role}\r\n'
                     if role == 'master' :
                         sec2='master_replid:'+RedisAsyncServer.master_replid
+                        print('sec2 =',sec2)
                         sec3='master_repl_offset:'+str(RedisAsyncServer.master_repl_offset)
+                        print('sec3 =',sec3)
                         response = response + f'${len(sec2)}\r\n{sec2}\r\n{len(sec3)}\r\n{sec3}\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
