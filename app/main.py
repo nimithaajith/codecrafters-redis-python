@@ -5,11 +5,11 @@ import threading
 from collections import deque,defaultdict
 
 class RedisServer():
-    def __init__(self,role,port=6379):
+    def __init__(self,role='master',port=6379):
         self.port= port
         self.role = role
 
-MasterRedisServer=RedisServer(role='master')
+RedisAsyncServer=RedisServer()
 class RedisObject():
     def __init__(self,data=None,data_type=None,exp=None,counter=0):
         self.data = data
@@ -669,10 +669,12 @@ async def client_handler(reader,writer):
             print('RECEIVED = ',query_string)
             input_tokens=query_string.splitlines()
             if 'info' in input_tokens or 'INFO' in input_tokens:
-                response='$11\r\nrole:master\r\n'
-                writer.write(response.encode())
-                await writer.drain() 
-                continue 
+                if 'replication' in input_tokens:
+                    role=RedisAsyncServer.role
+                    response='$11\r\nrole:{role}\r\n'
+                    writer.write(response.encode())
+                    await writer.drain() 
+                    continue 
             if input_tokens[2].upper() == 'MULTI' : 
                 MULTI[0]  = True
                 response =b'+OK\r\n'
@@ -750,7 +752,7 @@ async def run_server(port_number):
     try:
         redis_server=await asyncio.start_server(client_handler,host="localhost",port=port_number)
         print(f'Redis server listening {redis_server.sockets[0].getsockname()}')
-        MasterRedisServer.port =port_number
+        RedisAsyncServer.port =port_number
         asyncio.create_task(blocked_client_handler())                    
         await redis_server.serve_forever()
     except Exception as e:
@@ -766,6 +768,14 @@ def main():
             port_number=6379
     else:
         port_number=6379
+    if '--replicaof' in sys.argv:
+        try:
+            args=sys.argv
+            master_details=int(args[args.index('--replicaof')+1])
+            print("master =",master_details)
+            RedisAsyncServer.role='replica'
+        except:
+            pass
     print("Execution starts here....!")
 
     # server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
