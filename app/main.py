@@ -8,6 +8,8 @@ class RedisServer():
     def __init__(self,role='master',port=6379):
         self.port= port
         self.role = role
+        self.master_replid = ''
+        self.master_repl_offset=None
 
 RedisAsyncServer=RedisServer()
 class RedisObject():
@@ -671,8 +673,13 @@ async def client_handler(reader,writer):
             if 'info' in input_tokens or 'INFO' in input_tokens:
                 if 'replication' in input_tokens:
                     role=RedisAsyncServer.role
+                    
                     length=5+len(role)
                     response=f'${length}\r\nrole:{role}\r\n'
+                    if role == 'master' :
+                        sec2='master_replid:'+RedisAsyncServer.master_replid
+                        sec3='master_repl_offset:'+str(RedisAsyncServer.master_repl_offset)
+                        response = response + f'${len(sec2)}\r\n{sec2}\r\n{len(sec3)}\r\n{sec3}\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
                     continue 
@@ -780,6 +787,9 @@ def main():
             
         except:
             pass
+    if RedisAsyncServer.role=='master':
+        RedisAsyncServer.master_replid = '8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb'
+        RedisAsyncServer.master_repl_offset = 0
     print("Execution starts here....!role=",RedisAsyncServer.role, master_details)
 
     # server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
