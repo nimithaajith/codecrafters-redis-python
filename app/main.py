@@ -761,6 +761,8 @@ async def run_server(port_number):
 
 import sys
 def main():
+    master_details=''
+    port_number=6379
     if '--port' in sys.argv:
         try:
             args=sys.argv
@@ -773,7 +775,7 @@ def main():
         try:
             RedisAsyncServer.role='slave'
             args=sys.argv
-            master_details=int(args[args.index('--replicaof')+1])
+            master_details=args[args.index('--replicaof')+1]
             print("master =",master_details)
             
         except:
