@@ -10,6 +10,8 @@ class RedisServer():
         self.role = role
         self.master_replid = ''
         self.master_repl_offset=None
+        self.master_host=None
+        self.master_port=None
 
 RedisAsyncServer=RedisServer()
 class RedisObject():
@@ -767,6 +769,18 @@ async def run_server(port_number):
         redis_server=await asyncio.start_server(client_handler,host="localhost",port=port_number)
         print(f'Redis server listening {redis_server.sockets[0].getsockname()}')
         RedisAsyncServer.port =port_number
+        if RedisAsyncServer.role=='slave':
+            try:
+                m_reader,m_writer=await asyncio.open_connection(RedisAsyncServer.master_host,RedisAsyncServer.master_port)
+                print(f"Connected to master {RedisAsyncServer.master_host}:{RedisAsyncServer.master_port}")
+                m_writer.write(b'*1\r\n$4\r\nPING\r\n')
+                await m_writer.drain()
+            except Exception as e:
+                print("Client handling failed : Error ->",str(e))
+            finally:
+                m_writer.close()
+                await m_writer.wait_closed()
+
         asyncio.create_task(blocked_client_handler())                    
         await redis_server.serve_forever()
     except Exception as e:
@@ -788,8 +802,11 @@ def main():
         try:
             RedisAsyncServer.role='slave'
             args=sys.argv
-            master_details=args[args.index('--replicaof')+1]
-            print("master =",master_details)
+            master_details=args[args.index('--replicaof')+1].split(' ')
+            master_host = master_details[0].strip()
+            master_port = int(master_details[1].strip())
+            RedisAsyncServer.master_host=master_host
+            RedisAsyncServer.master_port=master_port
             
         except:
             pass
