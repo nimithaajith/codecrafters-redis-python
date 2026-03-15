@@ -773,8 +773,25 @@ async def run_server(port_number):
             try:
                 m_reader,m_writer=await asyncio.open_connection(RedisAsyncServer.master_host,RedisAsyncServer.master_port)
                 print(f"Connected to master {RedisAsyncServer.master_host}:{RedisAsyncServer.master_port}")
+                #sending PING
                 m_writer.write(b'*1\r\n$4\r\nPING\r\n')
                 await m_writer.drain()
+                data = await m_reader.readline()
+                print("MASTER says:", data.decode())
+
+                #sending REPLCONF listening-port <PORT>
+                response=f'*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n{RedisAsyncServer.port}\r\n'
+                m_writer.write(response.encode())
+                await m_writer.drain()
+                data = await m_reader.readline()
+                print("MASTER says:", data.decode())
+
+                # REPLCONF capa psync2
+                m_writer.write(b'*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n')
+                await m_writer.drain()
+                data = await m_reader.readline()
+                print("MASTER says:", data.decode())
+
             except Exception as e:
                 print("Client handling failed : Error ->",str(e))
             finally:
