@@ -790,7 +790,13 @@ async def run_server(port_number):
                 m_writer.write(b'*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n')
                 await m_writer.drain()
                 data = await m_reader.readline()
-                print("MASTER says:", data.decode())
+                if  data.decode()=='+OK':
+                    # sending PSYNC to master
+                    response=f'*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n'
+                    m_writer.write(response.encode())
+                    await m_writer.drain()
+                    data = await m_reader.readline()
+                    print("MASTER says:", data.decode())
 
             except Exception as e:
                 print("Client handling failed : Error ->",str(e))
