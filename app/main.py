@@ -751,7 +751,12 @@ async def client_handler(reader,writer):
                     writer.write(response.encode())
                     await writer.drain() 
                     continue 
-
+            if 'PSYNC' in input_tokens:
+                if RedisAsyncServer.role == 'master':
+                    response=f'+FULLRESYNC {RedisAsyncServer.master_replid} 0\r\n'
+                    writer.write(response.encode())
+                    await writer.drain() 
+                    continue 
                 
             if not query_string.startswith("*"):
                 await asyncio.sleep(0.2)
