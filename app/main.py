@@ -745,7 +745,13 @@ async def client_handler(reader,writer):
                     writer.write(response)
                     await writer.drain() 
                     continue  
-                            
+            if 'REPLCONF'  in input_tokens:
+                if RedisAsyncServer.role == 'master':
+                    response=f"+OK\r\n"
+                    writer.write(response.encode())
+                    await writer.drain() 
+                    continue 
+
                 
             if not query_string.startswith("*"):
                 await asyncio.sleep(0.2)
@@ -796,8 +802,7 @@ async def run_server(port_number):
                     m_writer.write(response.encode())
                     await m_writer.drain()
                     data = await m_reader.readline()
-                    print("MASTER says:", data.decode())
-
+                    
             except Exception as e:
                 print("Client handling failed : Error ->",str(e))
             finally:
