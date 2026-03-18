@@ -763,8 +763,9 @@ async def client_handler(reader,writer):
                     formated_bytes=''.join(format(b,'08b') for b in in_bytes)                    
                     #removed leading 0s
                     current_rdb_snapshot=formated_bytes[2:]
-                    response2=f'${len(current_rdb_snapshot)}\r\n'.encode()+current_rdb_snapshot
+                    response2=f'${len(current_rdb_snapshot)}\r\n'.encode()
                     writer.write(response2)
+                    writer.write(current_rdb_snapshot)
                     await writer.drain()
                     continue 
                 
