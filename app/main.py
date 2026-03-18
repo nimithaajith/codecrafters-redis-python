@@ -756,6 +756,16 @@ async def client_handler(reader,writer):
                     response=f'+FULLRESYNC {RedisAsyncServer.master_replid} 0\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
+                    rdb_hex='524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2'
+                    #hex to bytes
+                    in_bytes=bytes.fromhex(rdb_hex)
+                    #bytes to 8 bit binary
+                    formated_bytes=''.join(format(b,'08b') for b in in_bytes)                    
+                    #removed leading 0s
+                    current_rdb_snapshot=formated_bytes[2:]
+                    response2=f'${len(current_rdb_snapshot)}\r\n{current_rdb_snapshot}'
+                    writer.write(response2.encode())
+                    await writer.drain()
                     continue 
                 
             if not query_string.startswith("*"):
