@@ -675,8 +675,9 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
 
 async def client_handler(reader,writer):
     try:
-        print("Connected...") 
         client_addr = writer.get_extra_info('peername')       
+        
+        print("Connected...",client_addr,RedisAsyncServer.role) 
         CONNECT = True
         # multi command enabled, queue to hold upcoming commands
         MULTI=[False,deque()]
