@@ -12,7 +12,7 @@ class RedisServer():
         self.master_repl_offset=None
         self.master_host=None
         self.master_port=None
-        self.datastore={}
+        self.data_store={}
 
 RedisAsyncServer=RedisServer()
 ReplicaList=[]
