@@ -796,7 +796,8 @@ async def client_handler(reader,writer):
     await writer.wait_closed()
 
 async def command_propagation_handler(m_reader,m_writer,role):
-    client_addr = m_writer.get_extra_info('peername')     
+    client_addr = m_writer.get_extra_info('peername')  
+    print('inside command_propagation_handler')
     while True:
         command=await m_reader.read(1024)
         query_string=str(command.decode())            
@@ -841,8 +842,9 @@ async def run_server(port_number):
                     data = await m_reader.readline()
                     print("MASTER says:", data.decode())
                     length=int(data.decode().splitlines()[0].lstrip('$'))
-                    rdbfile=await m_reader.readexactly(length)
-                    print("MASTER says:", rdbfile)
+                    rdbfile=await m_reader.readexactly(length) 
+                    print('calling command_propagation_handler')
+                       
                     asyncio.create_task(command_propagation_handler(m_reader,m_writer,'slave')) 
 
                     
