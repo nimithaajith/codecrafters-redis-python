@@ -836,6 +836,7 @@ async def run_server(port_number):
                     m_writer.write(response.encode())
                     await m_writer.drain()
                     data = await m_reader.readline()
+                    data = await m_reader.readline()
                     length=int(data.decode().splitlines()[0].lstrip('$'))
                     rdbfile=await m_reader.readexactly(length)
                     asyncio.create_task(command_prpogation_handler(m_reader,m_writer,'slave')) 
