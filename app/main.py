@@ -279,6 +279,7 @@ async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
 
 async def propagate_command(query_string):
     for s_writer in ReplicaList:
+        print(">>>PROPAGATING>>>> ",query_string)
         s_writer.write(query_string.encode())
         await s_writer.drain()
     
@@ -313,6 +314,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             # print('###RESPONSE###')
             # print(response)
         elif data_list[0] == 'SET':
+            print("Inside SET , query_string",query_string)
             key=data_list[1]
             val=data_list[2]
             data_type = await get_data_type(val)
@@ -324,6 +326,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))
                 
             data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
+            print(f'{server_role} set the new value !!!!')
             response=f"+OK\r\n" 
             if server_role == 'master' :
                 await propagate_command(query_string)
