@@ -15,6 +15,7 @@ class RedisServer():
 
 RedisAsyncServer=RedisServer()
 ReplicaList=[]
+CommandDeque=deque()
 class RedisObject():
     def __init__(self,data=None,data_type=None,exp=None,counter=0):
         self.data = data
@@ -277,12 +278,14 @@ async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
                             return response,False                    
         await asyncio.sleep(0.01)
 
-async def propagate_command(query_string):
-    for s_writer in ReplicaList:
-        print(">>>PROPAGATING>>>> ",query_string)
-        s_writer.write(query_string.encode())
-        await s_writer.drain()
-        await asyncio.sleep(0.005)
+async def propagate_command():
+    while len(CommandDeque>0):
+        for s_writer in ReplicaList:
+            command_str=CommandDeque.popleft()
+            print(">>>PROPAGATING>>>>writer status ",command_str,s_writer.is_closed())
+            s_writer.write(command_str.encode())
+            await s_writer.drain()
+            await asyncio.sleep(0.001)
     
 
 async def command_handler(writer,client_addr,server_role,query_string,input_tokens):
@@ -776,6 +779,7 @@ async def client_handler(reader,writer):
                     writer.write(in_bytes)
                     await writer.drain()
                     ReplicaList.append(writer)
+                    print("$$$$$$ReplicaList$$$$$",ReplicaList)
                     continue 
                 
             if not query_string.startswith("*"):
@@ -785,8 +789,8 @@ async def client_handler(reader,writer):
             response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,input_tokens)
             if input_tokens[2] == 'SET':
                 if RedisAsyncServer.role == 'master' :
-                    await propagate_command(query_string)
-                    await asyncio.sleep(0.004)
+                    CommandDeque.append(query_string)
+                    await propagate_command()
                     query_string=''
             writer.write(response.encode())
             await writer.drain() 
