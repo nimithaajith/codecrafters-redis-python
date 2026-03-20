@@ -329,8 +329,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
             print(f'{server_role} set the new value !!!!')
             response=f"+OK\r\n" 
-            if server_role == 'master' :
-                await propagate_command(query_string)
+            
             # writer.write(response.encode())
             # await writer.drain()             
         elif data_list[0] == 'INCR': 
@@ -784,9 +783,13 @@ async def client_handler(reader,writer):
                 continue
             print("Calling command handler main")
             response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,input_tokens)
-            if not (input_tokens[2] == 'SET' and RedisAsyncServer.role == 'slave'):
-                writer.write(response.encode())
-                await writer.drain() 
+            if input_tokens[2] == 'SET':
+                if RedisAsyncServer.role == 'master' :
+                    await propagate_command(query_string)
+                    await asyncio.sleep(0.004)
+                    query_string=''
+            writer.write(response.encode())
+            await writer.drain() 
             if not CONNECT:
                 break
                 
@@ -795,8 +798,7 @@ async def client_handler(reader,writer):
     writer.close()
     await writer.wait_closed()
 
-async def command_propagation_handler(m_reader,m_writer,role):
-    client_addr = m_writer.get_extra_info('peername')  
+async def command_propagation_handler(m_reader):
     print('inside command_propagation_handler')
     while True:
         command=await m_reader.read(1024)
@@ -810,17 +812,7 @@ async def command_propagation_handler(m_reader,m_writer,role):
             if token.startswith('$') and token.strip() != '$':
                 continue
             data_list.append(token.strip())
-            # if data_list[0] == 'ECHO':
-            #     if len(data_list[1:] ) > 1:
-            #         echo_data=" ".join(data_list[1:])
-            #     else:
-            #         echo_data = data_list[1]
-            #     string_length=len(echo_data)
-                # response=f"${string_length}\r\n{echo_data}\r\n"  
-                # m_writer.write(response.encode())
-                # await m_writer.drain() 
-                # print('###RESPONSE###')
-                # print(response)
+            
             if data_list[0] == 'SET':
                 print("Inside SET , query_string",query_string)
                 key=data_list[1]
@@ -835,9 +827,7 @@ async def command_propagation_handler(m_reader,m_writer,role):
                     
                 data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
                 print(f'slave set the new value !!!!')
-                # response=f"+OK\r\n"                 
-                # writer.write(response.encode())
-                # await writer.drain()             
+                          
             elif data_list[0] == 'INCR': 
                 key =data_list[1]
                 response=None
@@ -852,30 +842,10 @@ async def command_propagation_handler(m_reader,m_writer,role):
                         # response="-ERR value is not an integer or out of range\r\n"
                 else:
                     data_store[key] = RedisObject(data = '1',data_type='string') 
-                    # response =f':1\r\n'
-                # writer.write(response.encode())
-                # await writer.drain() 
-                
-            # elif data_list[0] == 'GET': 
-            #     key=data_list[1]
-            #     if key in data_store.keys() :
-            #         val=data_store[key].data
-            #         val_length=len(val)
-            #         response=f'${val_length}\r\n{val}\r\n'
-            #         expiry=data_store[key].exp
-            #         if expiry :
-            #             if expiry < datetime.now(timezone.utc) :
-            #                 response = f"$-1\r\n"                       
+        await asyncio.sleep(0.2)
+                                      
                         
-            #     else:
-            #         response=f"$-1\r\n"
-                # writer.write(response.encode())
-                # await writer.drain()
-                # print('###RESPONSE###')
-                # print(response) 
-            #response = await command_handler(m_writer,client_addr,role,query_string,input_tokens)
-            
-    
+           
 
 async def run_server(port_number):
     try:
