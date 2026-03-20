@@ -815,7 +815,7 @@ async def command_propagation_handler(m_reader):
             query_string=str(command.decode())            
             input_tokens=query_string.splitlines()
             data_list=[]
-            print("COMMAND=",input_tokens)        
+            print("COMMAND=",query_string)        
             for token in input_tokens:
                 if len(token)>1 and token.startswith('*'):                
                     continue
