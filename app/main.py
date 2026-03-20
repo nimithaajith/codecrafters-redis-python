@@ -808,10 +808,13 @@ async def client_handler(reader,writer):
     await writer.wait_closed()
 
 async def command_propagation_handler(m_reader):
-    print('inside command_propagation_handler')
+    print('inside command_propagation_handler',m_reader.is_closed())
     while True:
         try:
             command=await m_reader.read(1024)
+            if not command:
+                await asyncio.sleep(0.1)
+                continue
             query_string=str(command.decode())            
             input_tokens=query_string.splitlines()
             data_list=[]
@@ -852,7 +855,7 @@ async def command_propagation_handler(m_reader):
                             # response="-ERR value is not an integer or out of range\r\n"
                     else:
                         RedisAsyncServer.data_store[key] = RedisObject(data = '1',data_type='string') 
-            await asyncio.sleep(0.2)
+            
         except Exception as e:
             print("EXCEPTION=",e)
                                       
