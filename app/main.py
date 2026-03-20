@@ -802,7 +802,78 @@ async def command_propagation_handler(m_reader,m_writer,role):
         command=await m_reader.read(1024)
         query_string=str(command.decode())            
         input_tokens=query_string.splitlines()
-        response = await command_handler(m_writer,client_addr,role,query_string,input_tokens)
+        data_list=[]
+        print("COMMAND=",input_tokens)        
+        for token in input_tokens:
+            if len(token)>1 and token.startswith('*'):                
+                continue
+            if token.startswith('$') and token.strip() != '$':
+                continue
+            data_list.append(token.strip())
+            # if data_list[0] == 'ECHO':
+            #     if len(data_list[1:] ) > 1:
+            #         echo_data=" ".join(data_list[1:])
+            #     else:
+            #         echo_data = data_list[1]
+            #     string_length=len(echo_data)
+                # response=f"${string_length}\r\n{echo_data}\r\n"  
+                # m_writer.write(response.encode())
+                # await m_writer.drain() 
+                # print('###RESPONSE###')
+                # print(response)
+            if data_list[0] == 'SET':
+                print("Inside SET , query_string",query_string)
+                key=data_list[1]
+                val=data_list[2]
+                data_type = await get_data_type(val)
+                expiry =None
+                if len(data_list) > 3:
+                    if data_list[3] == 'PX':
+                        expiry = datetime.now(timezone.utc) + timedelta(milliseconds=int(data_list[4]))
+                    elif data_list[3] == 'EX' :
+                        expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))
+                    
+                data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
+                print(f'slave set the new value !!!!')
+                # response=f"+OK\r\n"                 
+                # writer.write(response.encode())
+                # await writer.drain()             
+            elif data_list[0] == 'INCR': 
+                key =data_list[1]
+                response=None
+                if key in data_store:
+                    redis_obj=data_store[key]
+                    if redis_obj.data.isdigit():
+                        new_val = str(int(redis_obj.data)+1)
+                        redis_obj.data = new_val
+                        # response =f':{new_val}\r\n'
+                    else:
+                        pass
+                        # response="-ERR value is not an integer or out of range\r\n"
+                else:
+                    data_store[key] = RedisObject(data = '1',data_type='string') 
+                    # response =f':1\r\n'
+                # writer.write(response.encode())
+                # await writer.drain() 
+                
+            # elif data_list[0] == 'GET': 
+            #     key=data_list[1]
+            #     if key in data_store.keys() :
+            #         val=data_store[key].data
+            #         val_length=len(val)
+            #         response=f'${val_length}\r\n{val}\r\n'
+            #         expiry=data_store[key].exp
+            #         if expiry :
+            #             if expiry < datetime.now(timezone.utc) :
+            #                 response = f"$-1\r\n"                       
+                        
+            #     else:
+            #         response=f"$-1\r\n"
+                # writer.write(response.encode())
+                # await writer.drain()
+                # print('###RESPONSE###')
+                # print(response) 
+            #response = await command_handler(m_writer,client_addr,role,query_string,input_tokens)
             
     
 
@@ -842,9 +913,7 @@ async def run_server(port_number):
                     data = await m_reader.readline()
                     print("MASTER says:", data.decode())
                     length=int(data.decode().splitlines()[0].lstrip('$'))
-                    rdbfile=await m_reader.readexactly(length) 
-                    print('calling command_propagation_handler')
-                       
+                    rdbfile=await m_reader.readexactly(length)                      
                     asyncio.create_task(command_propagation_handler(m_reader,m_writer,'slave')) 
 
                     
