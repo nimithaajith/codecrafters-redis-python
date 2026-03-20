@@ -780,8 +780,9 @@ async def client_handler(reader,writer):
                 continue
             print("Calling command handler main")
             response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,input_tokens)
-            writer.write(response.encode())
-            await writer.drain() 
+            if not (input_tokens[2] == 'SET' and RedisAsyncServer.role == 'slave'):
+                writer.write(response.encode())
+                await writer.drain() 
             if not CONNECT:
                 break
                 
