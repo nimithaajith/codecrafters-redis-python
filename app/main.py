@@ -283,7 +283,7 @@ async def propagate_command():
     while len(CommandDeque>0):
         for s_writer in ReplicaList:
             command_str=CommandDeque.popleft()
-            print(">>>PROPAGATING>>>>writer status ",command_str,s_writer.is_closed())
+            print(">>>PROPAGATING>>>>writer status ",command_str)
             s_writer.write(command_str.encode())
             await s_writer.drain()
             await asyncio.sleep(0.001)
@@ -808,7 +808,7 @@ async def client_handler(reader,writer):
     await writer.wait_closed()
 
 async def command_propagation_handler(m_reader):
-    print('inside command_propagation_handler',m_reader.is_closed())
+    print('inside command_propagation_handler',)
     while True:
         try:
             command=await m_reader.read(1024)
