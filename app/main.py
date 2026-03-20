@@ -794,7 +794,15 @@ async def client_handler(reader,writer):
     writer.close()
     await writer.wait_closed()
 
-
+async def command_prpogation_handler(m_reader,m_writer,role):
+    client_addr = m_writer.get_extra_info('peername')     
+    while True:
+        command=command_prpogation_handler(m_reader)
+        query_string=str(command.decode())            
+        input_tokens=query_string.splitlines()
+        response = await command_handler(m_writer,client_addr,role,query_string,input_tokens)
+            
+    
 
 async def run_server(port_number):
     try:
@@ -828,6 +836,9 @@ async def run_server(port_number):
                     m_writer.write(response.encode())
                     await m_writer.drain()
                     data = await m_reader.readline()
+                    length=int(data.decode().splitlines()[0].lstrip('$'))
+                    rdbfile=await m_reader.readexactly(length)
+                    asyncio.create_task(command_prpogation_handler(m_reader,m_writer,'slave')) 
 
                     
             except Exception as e:
