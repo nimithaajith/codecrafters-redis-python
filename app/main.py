@@ -14,6 +14,7 @@ class RedisServer():
         self.master_port=None
 
 RedisAsyncServer=RedisServer()
+ReplicaList=[]
 class RedisObject():
     def __init__(self,data=None,data_type=None,exp=None,counter=0):
         self.data = data
@@ -276,7 +277,13 @@ async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
                             return response,False                    
         await asyncio.sleep(0.01)
 
-async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
+async def propagate_command(query_string):
+    for s_writer in ReplicaList:
+        s_writer.write(query_string.encode())
+        await s_writer.drain()
+    
+
+async def command_handler(writer,client_addr,server_role,query_string,input_tokens):
     input_tokens=query_string.splitlines()
     no_of_elements=int(input_tokens[0].lstrip('*'))               
     data_list=[]
@@ -317,7 +324,9 @@ async def command_handler(writer,client_addr,MULTI,query_string,input_tokens):
                     expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))
                 
             data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
-            response=f"+OK\r\n"  
+            response=f"+OK\r\n" 
+            if server_role == 'master' :
+                await propagate_command(query_string)
             # writer.write(response.encode())
             # await writer.drain()             
         elif data_list[0] == 'INCR': 
@@ -714,7 +723,7 @@ async def client_handler(reader,writer):
                             
                             query_string=MULTI[1].popleft()
                             input_tokens=query_string.splitlines()
-                            cmd_response = await command_handler(writer,client_addr,MULTI,query_string,input_tokens)
+                            cmd_response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,input_tokens)
                             response = response+ f'{cmd_response}'
                         writer.write(response.encode())
                         print("$$$$$$RESPONSE::::",response)
@@ -759,21 +768,18 @@ async def client_handler(reader,writer):
                     rdb_hex='524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2'
                     #hex to bytes
                     in_bytes=bytes.fromhex(rdb_hex)
-                    #bytes to 8 bit binary
-                    formated_bytes=''.join(format(b,'08b') for b in in_bytes)                    
-                    #removed leading 0s
-                    current_rdb_snapshot=formated_bytes[2:]
                     response2=f'${len(in_bytes)}\r\n'
                     writer.write(response2.encode())
                     writer.write(in_bytes)
                     await writer.drain()
+                    ReplicaList.append(writer)
                     continue 
                 
             if not query_string.startswith("*"):
                 await asyncio.sleep(0.2)
                 continue
             print("Calling command handler main")
-            response = await command_handler(writer,client_addr,MULTI,query_string,input_tokens)
+            response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,input_tokens)
             writer.write(response.encode())
             await writer.drain() 
             if not CONNECT:
@@ -818,6 +824,7 @@ async def run_server(port_number):
                     m_writer.write(response.encode())
                     await m_writer.drain()
                     data = await m_reader.readline()
+
                     
             except Exception as e:
                 print("Client handling failed : Error ->",str(e))
