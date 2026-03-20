@@ -282,6 +282,7 @@ async def propagate_command(query_string):
         print(">>>PROPAGATING>>>> ",query_string)
         s_writer.write(query_string.encode())
         await s_writer.drain()
+        await asyncio.sleep(0.005)
     
 
 async def command_handler(writer,client_addr,server_role,query_string,input_tokens):
