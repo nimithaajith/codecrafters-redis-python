@@ -841,7 +841,7 @@ async def run_server(port_number):
                     print("MASTER says:", data.decode())
                     length=int(data.decode().splitlines()[0].lstrip('$'))
                     rdbfile=await m_reader.readexactly(length)
-                    print("MASTER says:", rdbfile.decode())
+                    print("MASTER says:", rdbfile)
                     asyncio.create_task(command_propagation_handler(m_reader,m_writer,'slave')) 
 
                     
