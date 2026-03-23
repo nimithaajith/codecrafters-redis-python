@@ -852,45 +852,56 @@ async def command_propagation_handler():
                     continue
                 query_string=str(command.decode())            
                 input_tokens=query_string.splitlines()
-                data_list=[]
+                data_lists=deque()
+                length_list=[]
                 print("query_string=",query_string)        
                 for token in input_tokens:
-                    if len(token)>1 and token.startswith('*'):                
+                    if len(token)>1 and token.startswith('*'):   
+                        length_list.append(int(token.lstrip('*')))             
                         continue
                     if token.startswith('$') and token.strip() != '$':
                         continue
-                    data_list.append(token.strip())
-                print("data_list:",data_list)
-                
-                if data_list[0] == 'SET':
-                    print("Inside SET , query_string",query_string)
-                    key=data_list[1]
-                    val=data_list[2]
-                    data_type = await get_data_type(val)
-                    expiry =None
-                    if len(data_list) > 3:
-                        if data_list[3] == 'PX':
-                            expiry = datetime.now(timezone.utc) + timedelta(milliseconds=int(data_list[4]))
-                        elif data_list[3] == 'EX' :
-                            expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))
-                        
-                    RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
-                    print(f'slave set the new value !!!!',RedisAsyncServer.data_store[key].data)
+                    data_lists.append(token.strip())
+                print("data_list:",data_lists)
+                commands_list=[]
+                for l in length_list:
+                    new_com=[]
+                    i=1
+                    while i<=l:
+                        new_com.append(data_lists.popleft())
+                    commands_list.append(new_com)
+
+                for data_list in commands_list: 
+                    print("processing command:",data_list)               
+                    if data_list[0] == 'SET':
+                        print("Inside SET ")
+                        key=data_list[1]
+                        val=data_list[2]
+                        data_type = await get_data_type(val)
+                        expiry =None
+                        if len(data_list) > 3:
+                            if data_list[3] == 'PX':
+                                expiry = datetime.now(timezone.utc) + timedelta(milliseconds=int(data_list[4]))
+                            elif data_list[3] == 'EX' :
+                                expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))
                             
-                elif data_list[0] == 'INCR': 
-                    key =data_list[1]
-                    response=None
-                    if key in RedisAsyncServer.data_store:
-                        redis_obj=RedisAsyncServer.data_store[key]
-                        if redis_obj.data.isdigit():
-                            new_val = str(int(redis_obj.data)+1)
-                            redis_obj.data = new_val
-                            # response =f':{new_val}\r\n'
+                        RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
+                        print(f'slave set the new value !!!!',RedisAsyncServer.data_store[key].data)
+                                
+                    elif data_list[0] == 'INCR': 
+                        key =data_list[1]
+                        response=None
+                        if key in RedisAsyncServer.data_store:
+                            redis_obj=RedisAsyncServer.data_store[key]
+                            if redis_obj.data.isdigit():
+                                new_val = str(int(redis_obj.data)+1)
+                                redis_obj.data = new_val
+                                # response =f':{new_val}\r\n'
+                            else:
+                                pass
+                                # response="-ERR value is not an integer or out of range\r\n"
                         else:
-                            pass
-                            # response="-ERR value is not an integer or out of range\r\n"
-                    else:
-                        RedisAsyncServer.data_store[key] = RedisObject(data = '1',data_type='string') 
+                            RedisAsyncServer.data_store[key] = RedisObject(data = '1',data_type='string') 
                 
             except Exception as e:
                 print("EXCEPTION=",e)
