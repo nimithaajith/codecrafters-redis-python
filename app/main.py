@@ -869,6 +869,7 @@ async def command_propagation_handler():
                     i=1
                     while i<=l:
                         new_com.append(data_lists.popleft())
+                        i=i+1
                     commands_list.append(new_com)
 
                 for data_list in commands_list: 
