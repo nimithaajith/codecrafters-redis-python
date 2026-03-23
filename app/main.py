@@ -280,7 +280,7 @@ async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
         await asyncio.sleep(0.01)
 
 async def propagate_command():
-    while len(CommandDeque>0):
+    while len(CommandDeque)>0:
         for s_writer in ReplicaList:
             command_str=CommandDeque.popleft()
             print(">>>PROPAGATING>>>>writer status ",command_str)
@@ -807,24 +807,60 @@ async def client_handler(reader,writer):
     writer.close()
     await writer.wait_closed()
 
-async def command_propagation_handler(m_reader):
+async def command_propagation_handler():
     print('inside command_propagation_handler',)
-    while True:
-        try:
-            command=await m_reader.read(1024)
-            if not command:
-                await asyncio.sleep(0.1)
-                continue
-            query_string=str(command.decode())            
-            input_tokens=query_string.splitlines()
-            data_list=[]
-            print("COMMAND=",query_string)        
-            for token in input_tokens:
-                if len(token)>1 and token.startswith('*'):                
+    try:
+        m_reader,m_writer=await asyncio.open_connection(RedisAsyncServer.master_host,RedisAsyncServer.master_port)
+        print(f"Connected to master {RedisAsyncServer.master_host}:{RedisAsyncServer.master_port}")
+        #sending PING
+        m_writer.write(b'*1\r\n$4\r\nPING\r\n')
+        await m_writer.drain()
+        data = await m_reader.readline()
+        print("MASTER says:", data.decode())
+
+        #sending REPLCONF listening-port <PORT>
+        response=f'*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n{RedisAsyncServer.port}\r\n'
+        m_writer.write(response.encode())
+        await m_writer.drain()
+        data = await m_reader.readline()
+        print("MASTER says:", data.decode())
+
+        # REPLCONF capa psync2
+        m_writer.write(b'*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n')
+        await m_writer.drain()
+        data = await m_reader.readline()
+        if  'OK' in data.decode():
+            # sending PSYNC to master
+            response=f'*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n'
+            m_writer.write(response.encode())
+            await m_writer.drain()
+            data = await m_reader.readline()
+            print("MASTER says:", data.decode())
+            data = await m_reader.readline()
+            print("MASTER says:", data.decode())
+            length=int(data.decode().splitlines()[0].lstrip('$'))
+            rdbfile=await m_reader.readexactly(length) 
+            print(f"MASTER send RDB file of {length} bytes")
+            
+        while True:
+            try:
+                print("Inside while loop, waiting on master command !!!!")
+                command=await m_reader.read(1024)
+                print("COMMAND=",command) 
+                if not command:
+                    await asyncio.sleep(0.1)
                     continue
-                if token.startswith('$') and token.strip() != '$':
-                    continue
-                data_list.append(token.strip())
+                query_string=str(command.decode())            
+                input_tokens=query_string.splitlines()
+                data_list=[]
+                print("query_string=",query_string)        
+                for token in input_tokens:
+                    if len(token)>1 and token.startswith('*'):                
+                        continue
+                    if token.startswith('$') and token.strip() != '$':
+                        continue
+                    data_list.append(token.strip())
+                print("data_list:",data_list)
                 
                 if data_list[0] == 'SET':
                     print("Inside SET , query_string",query_string)
@@ -839,7 +875,7 @@ async def command_propagation_handler(m_reader):
                             expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))
                         
                     RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
-                    print(f'slave set the new value !!!!')
+                    print(f'slave set the new value !!!!',RedisAsyncServer.data_store[key].data)
                             
                 elif data_list[0] == 'INCR': 
                     key =data_list[1]
@@ -855,10 +891,16 @@ async def command_propagation_handler(m_reader):
                             # response="-ERR value is not an integer or out of range\r\n"
                     else:
                         RedisAsyncServer.data_store[key] = RedisObject(data = '1',data_type='string') 
-            
-        except Exception as e:
-            print("EXCEPTION=",e)
-                                      
+                
+            except Exception as e:
+                print("EXCEPTION=",e)
+    except Exception as e:
+            print("Client handling failed : Error ->",str(e))
+    finally:
+        m_writer.close()
+        await m_writer.wait_closed()
+
+                                        
                         
            
 
@@ -868,49 +910,7 @@ async def run_server(port_number):
         print(f'Redis server listening {redis_server.sockets[0].getsockname()}')
         RedisAsyncServer.port =port_number
         if RedisAsyncServer.role=='slave':
-            try:
-                m_reader,m_writer=await asyncio.open_connection(RedisAsyncServer.master_host,RedisAsyncServer.master_port)
-                print(f"Connected to master {RedisAsyncServer.master_host}:{RedisAsyncServer.master_port}")
-                #sending PING
-                m_writer.write(b'*1\r\n$4\r\nPING\r\n')
-                await m_writer.drain()
-                data = await m_reader.readline()
-                print("MASTER says:", data.decode())
-
-                #sending REPLCONF listening-port <PORT>
-                response=f'*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n{RedisAsyncServer.port}\r\n'
-                m_writer.write(response.encode())
-                await m_writer.drain()
-                data = await m_reader.readline()
-                print("MASTER says:", data.decode())
-
-                # REPLCONF capa psync2
-                m_writer.write(b'*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n')
-                await m_writer.drain()
-                data = await m_reader.readline()
-                if  'OK' in data.decode():
-                    # sending PSYNC to master
-                    response=f'*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n'
-                    m_writer.write(response.encode())
-                    await m_writer.drain()
-                    data = await m_reader.readline()
-                    print("MASTER says:", data.decode())
-                    data = await m_reader.readline()
-                    print("MASTER says:", data.decode())
-                    length=int(data.decode().splitlines()[0].lstrip('$'))
-                    rdbfile=await m_reader.readexactly(length) 
-                    try:                     
-                        asyncio.create_task(command_propagation_handler(m_reader))
-                    except Exception as e:
-                        print("EXCEPTION=",e)
-
-                    
-            except Exception as e:
-                print("Client handling failed : Error ->",str(e))
-            finally:
-                m_writer.close()
-                await m_writer.wait_closed()
-
+            asyncio.create_task(command_propagation_handler())            
         asyncio.create_task(blocked_client_handler())                    
         await redis_server.serve_forever()
     except Exception as e:
