@@ -810,6 +810,7 @@ async def client_handler(reader,writer):
 
 async def command_propagation_handler():
     print('inside command_propagation_handler',)
+    command_offset=0
     try:
         m_reader,m_writer=await asyncio.open_connection(RedisAsyncServer.master_host,RedisAsyncServer.master_port)
         print(f"Connected to master {RedisAsyncServer.master_host}:{RedisAsyncServer.master_port}")
@@ -847,15 +848,18 @@ async def command_propagation_handler():
             try:
                 print("Inside while loop, waiting on master command !!!!")
                 command=await m_reader.read(1024)
+                command_len=0
                 print("COMMAND=",command) 
                 if not command:
                     await asyncio.sleep(0.1)
                     continue
+                command_len=len(command)
                 query_string=str(command.decode()) 
                 if command == b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n' or command == b'*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n' :
-                    response='*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n'  
+                    response=f'*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n${len(str(command_offset))}\r\n{str(command_offset)}\r\n'  
                     m_writer.write(response.encode())  
                     await m_writer.drain() 
+                    command_offset=command_offset + command_len
                     continue     
                 input_tokens=query_string.splitlines()
                 data_lists=deque()
@@ -909,7 +913,7 @@ async def command_propagation_handler():
                                 # response="-ERR value is not an integer or out of range\r\n"
                         else:
                             RedisAsyncServer.data_store[key] = RedisObject(data = '1',data_type='string') 
-                
+                command_offset=command_offset + command_len
             except Exception as e:
                 print("EXCEPTION=",e)
     except Exception as e:
