@@ -919,9 +919,9 @@ async def command_propagation_handler():
                         command_len=0
                         continue     
                     elif data_list[0].upper() == 'PING' :
-                        response=f"+PONG\r\n"
-                        m_writer.write(response.encode())  
-                        await m_writer.drain() 
+                        # response=f"+PONG\r\n"
+                        # m_writer.write(response.encode())  
+                        # await m_writer.drain() 
                         command_len=14
                         command_offset=command_offset + command_len
                         command_len=0
