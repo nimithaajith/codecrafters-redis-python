@@ -853,13 +853,15 @@ async def command_propagation_handler():
                 if not command:
                     await asyncio.sleep(0.1)
                     continue
-                command_len=len(command)
+                
                 query_string=str(command.decode()) 
                 if command == b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n' or command == b'*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n' :
                     response=f'*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n${len(str(command_offset))}\r\n{str(command_offset)}\r\n'  
                     m_writer.write(response.encode())  
                     await m_writer.drain() 
+                    command_len=len(command)
                     command_offset=command_offset + command_len
+                    command_len=0
                     continue     
                 input_tokens=query_string.splitlines()
                 data_lists=deque()
@@ -885,9 +887,10 @@ async def command_propagation_handler():
                 for data_list in commands_list: 
                     print("processing command:",data_list)               
                     if data_list[0] == 'SET':
+                        command_len=0
                         print("Inside SET ")
                         key=data_list[1]
-                        val=data_list[2]
+                        val=data_list[2]                        
                         data_type = await get_data_type(val)
                         expiry =None
                         if len(data_list) > 3:
@@ -897,8 +900,33 @@ async def command_propagation_handler():
                                 expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))
                             
                         RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
+                        command_string=''
+
+                        for s in data_list:
+                            command_string=command_string+f'${len(str(s))}\r\n{str(s)}\r\n'
+
+                        command_string=f'*{len(data_list)}\r\n'
+                        command_len=len(command_string.encode())
+                        command_offset=command_offset+command_len
+                        command_len=0
                         print(f'slave set the new value !!!!',RedisAsyncServer.data_store[key].data)
-                                
+                    elif data_list[0].upper() == 'REPLCONF' and data_list[1].upper() == 'GETACK': 
+                        response=f'*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n${len(str(command_offset))}\r\n{str(command_offset)}\r\n'  
+                        m_writer.write(response.encode())  
+                        await m_writer.drain() 
+                        command_len=37
+                        command_offset=command_offset + command_len
+                        command_len=0
+                        continue     
+                    elif data_list[0].upper() == 'PING' :
+                        response=f"+PONG\r\n"
+                        m_writer.write(response.encode())  
+                        await m_writer.drain() 
+                        command_len=14
+                        command_offset=command_offset + command_len
+                        command_len=0
+                        continue     
+
                     elif data_list[0] == 'INCR': 
                         key =data_list[1]
                         response=None
@@ -913,7 +941,7 @@ async def command_propagation_handler():
                                 # response="-ERR value is not an integer or out of range\r\n"
                         else:
                             RedisAsyncServer.data_store[key] = RedisObject(data = '1',data_type='string') 
-                command_offset=command_offset + command_len
+                # command_offset=command_offset + command_len
             except Exception as e:
                 print("EXCEPTION=",e)
     except Exception as e:
