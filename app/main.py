@@ -905,7 +905,7 @@ async def command_propagation_handler():
                         for s in data_list:
                             command_string=command_string+f'${len(str(s))}\r\n{str(s)}\r\n'
 
-                        command_string=f'*{len(data_list)}\r\n'
+                        command_string=f'*{len(data_list)}\r\n'+command_string
                         command_len=len(command_string.encode())
                         command_offset=command_offset+command_len
                         command_len=0
