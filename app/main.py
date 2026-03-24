@@ -851,7 +851,12 @@ async def command_propagation_handler():
                 if not command:
                     await asyncio.sleep(0.1)
                     continue
-                query_string=str(command.decode())            
+                query_string=str(command.decode()) 
+                if query_string == '*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n' :
+                    response='*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n'  
+                    m_writer.write(response.encode())  
+                    await m_writer.drain() 
+                    continue     
                 input_tokens=query_string.splitlines()
                 data_lists=deque()
                 length_list=[]
