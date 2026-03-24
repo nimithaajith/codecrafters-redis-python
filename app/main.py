@@ -281,9 +281,9 @@ async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
 
 async def propagate_command():
     while len(CommandDeque)>0:
-        for s_writer in ReplicaList:
-            command_str=CommandDeque.popleft()
-            print(">>>PROPAGATING>>>>writer status ",command_str)
+        command_str=CommandDeque.popleft()
+        print(">>>PROPAGATING>>>>writer status ",command_str)
+        for s_writer in ReplicaList:             
             s_writer.write(command_str.encode())
             await s_writer.drain()
             await asyncio.sleep(0.001)
