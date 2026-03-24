@@ -795,6 +795,7 @@ async def client_handler(reader,writer):
             if input_tokens[2] == 'SET':
                 if RedisAsyncServer.role == 'master' :
                     CommandDeque.append(query_string)
+                    print("added to CommandDeque=",CommandDeque)
                     await propagate_command()
                     query_string=''
             writer.write(response.encode())
