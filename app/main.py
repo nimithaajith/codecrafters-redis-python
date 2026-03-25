@@ -783,7 +783,12 @@ async def client_handler(reader,writer):
                     ReplicaList.append(writer)
                     print("$$$$$$ReplicaList$$$$$",ReplicaList)
                     continue 
-                
+            if 'WAIT' in input_tokens or 'wait' in input_tokens:
+                if RedisAsyncServer.role == 'master':
+                    response=f':0\r\n'
+                    writer.write(response.encode())
+                    await writer.drain() 
+                continue    
             if not query_string.startswith("*"):
                 await asyncio.sleep(0.2)
                 continue
