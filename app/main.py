@@ -785,7 +785,7 @@ async def client_handler(reader,writer):
                     continue 
             if 'WAIT' in input_tokens or 'wait' in input_tokens:
                 if RedisAsyncServer.role == 'master':
-                    response=f':0\r\n'
+                    response=f':{len(ReplicaList)}\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
                 continue    
