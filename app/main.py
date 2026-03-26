@@ -752,7 +752,7 @@ async def client_handler(reader,writer):
                     length=5+len(role)
                     
                     if role == 'master' :
-                        sec2='master_replid:'+RedisAsyncServer.master_replid
+                        sec2='master_replid:'+RedisAsyncServer.server.master_replid
                         print('sec2 =',sec2)
                         sec3='master_repl_offset:'+str(RedisAsyncServer.server.master_repl_offset)
                         print('sec3 =',sec3)
@@ -826,7 +826,7 @@ async def client_handler(reader,writer):
                     continue 
             if 'PSYNC' in input_tokens:
                 if RedisAsyncServer.role == 'master':
-                    response=f'+FULLRESYNC {RedisAsyncServer.master_replid} 0\r\n'
+                    response=f'+FULLRESYNC {RedisAsyncServer.server.master_replid} 0\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
                     rdb_hex='524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2'
