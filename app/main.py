@@ -390,7 +390,9 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             if replica_offset == ReplicaList[writer][0] :
                 ReplicaList[writer][1] =True
             else:
-                ReplicaList[writer][1] =False    
+                ReplicaList[writer][1] =False  
+            print("Processed REPLCONF ACK")  
+            response='REPLCONF ACK'
                           
         elif data_list[0] == 'INCR': 
             key =data_list[1]
@@ -862,8 +864,9 @@ async def client_handler(reader,writer):
                     print("added to CommandDeque=",CommandDeque)
                     await propagate_command()
                     query_string=''
-            writer.write(response.encode())
-            await writer.drain() 
+            if not response == 'REPLCONF ACK':
+                writer.write(response.encode())
+                await writer.drain() 
             if not CONNECT:
                 break
                 
