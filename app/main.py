@@ -837,9 +837,9 @@ async def client_handler(reader,writer):
                     writer.write(in_bytes)
                     await writer.drain()
                     #adding replica and its command offset
-                    ReplicaList[writer][0]=0
-                    ReplicaList[writer][1]=True
-                    # print("$$$$$$ReplicaList$$$$$",ReplicaList)
+                    ReplicaList[writer]=[0,True]
+                    
+                    print("$$$$$$ ADDED to ReplicaList$$$$$",ReplicaList[writer])
                     continue 
             
             # if 'WAIT' in input_tokens or 'wait' in input_tokens:
