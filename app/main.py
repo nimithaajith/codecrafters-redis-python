@@ -348,7 +348,7 @@ async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
     while synced_replicas < no_of_awaited_replicas : 
         if datetime.now(timezone.utc) < timeout:
             check =1
-            while check <10:
+            while check <20:
                 synced_replicas,replica_temp_list=await process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaited_replicas)
                 print("synced_replicas : ",synced_replicas)
                 if synced_replicas==no_of_awaited_replicas:
