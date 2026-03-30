@@ -356,6 +356,8 @@ async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
                 else:
                     await asyncio.sleep(0.001)
                     check +=1
+                    if datetime.now(timezone.utc) >= timeout:
+                        return synced_replicas
             
         else:
             return synced_replicas
