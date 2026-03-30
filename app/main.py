@@ -354,7 +354,8 @@ async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
                 print("synced_replicas : ",synced_replicas)
                 return no_of_awaited_replicas
             else:
-                await asyncio.sleep(0.001)         
+                await asyncio.sleep(0.001)  
+    print("synced_replicas :timeout ",synced_replicas)       
     return synced_replicas
 
     
@@ -421,7 +422,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 current_time = datetime.now(timezone.utc)
                 timeout=current_time+timedelta(milliseconds=wait_command_timeout)
                 no_of_ack_replicas=await get_ack_replicas(no_of_awaited_replicas,timeout,wait_command_timeout)
-
+                print("sending response from WAIT :",no_of_ack_replicas)
                 # no_of_ack_replicas= await get_acknowledged_replicas()
 
                     #send REPLCONF GETACK * to each replica in replicalist
