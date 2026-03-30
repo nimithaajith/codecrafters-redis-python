@@ -363,7 +363,7 @@ async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
             
         else:
             return synced_replicas
-        await asyncio.sleep()
+        await asyncio.sleep(check_turns)
         await propagate_getack_command(replica_temp_list)
     return synced_replicas
 
