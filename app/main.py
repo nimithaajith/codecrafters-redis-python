@@ -345,26 +345,16 @@ async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
     replica_temp_list=list(RedisAsyncServer.server.ReplicaList.keys()) 
     await propagate_getack_command(replica_temp_list)
     synced_replicas=0
-    check_turns=waittime//10
+    
     while synced_replicas < no_of_awaited_replicas : 
-        if datetime.now(timezone.utc) < timeout:
-            check =1
-            while check <check_turns:
-                synced_replicas,replica_temp_list=await process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaited_replicas)
-                # print("synced_replicas : ",synced_replicas)
-                if synced_replicas==no_of_awaited_replicas:
-                    print("synced_replicas : ",synced_replicas)
-                    return no_of_awaited_replicas
-                else:
-                    await asyncio.sleep(0.001)
-                    check +=1
-                    if datetime.now(timezone.utc) >= timeout:
-                        return synced_replicas
-            
-        else:
-            return synced_replicas
-        await asyncio.sleep(check_turns)
-        await propagate_getack_command(replica_temp_list)
+        while datetime.now(timezone.utc) < timeout:
+            synced_replicas,replica_temp_list=await process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaited_replicas)
+            # print("synced_replicas : ",synced_replicas)
+            if synced_replicas==no_of_awaited_replicas:
+                print("synced_replicas : ",synced_replicas)
+                return no_of_awaited_replicas
+            else:
+                await asyncio.sleep(0.001)         
     return synced_replicas
 
     
