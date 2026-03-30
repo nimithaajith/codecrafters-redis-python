@@ -17,17 +17,21 @@ class RedisServer():
 class Replica():
     def __init__(self):
         self.replica_command_offset=0
+        print('replica offset initialized to 0')
         
 
 class Master():
     def __init__(self):
         self.master_replid = ''
         self.master_repl_offset=None
+        # dict of Lists,key is slave-writer,value is list(replica's offset,sync)
+        # sync is true means replica's offset and  replica server's replica_command_offset are same
+        self.ReplicaList={}
 
     
 
 RedisAsyncServer=RedisServer()
-ReplicaList={}
+
 CommandDeque=deque()
 class RedisObject():
     def __init__(self,data=None,data_type=None,exp=None,counter=0):
@@ -296,27 +300,74 @@ async def propagate_command():
         command_str=CommandDeque.popleft()
         print(">>>PROPAGATING>>>>writer status ",command_str)
         cmd_encoded=command_str.encode()
-        for s_writer in ReplicaList.keys():             
+        for s_writer in RedisAsyncServer.server.ReplicaList.keys():             
             s_writer.write(cmd_encoded)
             await s_writer.drain()            
-            curr_offset=ReplicaList[s_writer][0]
+            curr_offset=RedisAsyncServer.server.ReplicaList[s_writer][0]
+            print("server side offset of replica =",curr_offset)
             # server side update of offset
-            ReplicaList[s_writer][0] = curr_offset+len(cmd_encoded)
-            ReplicaList[s_writer][1]=False
-            print(ReplicaList[s_writer])
+            RedisAsyncServer.server.ReplicaList[s_writer][0] = curr_offset+len(cmd_encoded)
+            print("server side  new offset of replica =",RedisAsyncServer.server.ReplicaList[s_writer][0])
+            
+            RedisAsyncServer.server.ReplicaList[s_writer][1]=False
+            print("Updated offset and sync to false by master")
             # await asyncio.sleep(0.001)
 
-async def get_acknowledged_replicas():
-    count=0
-    for _,sync in ReplicaList.items():  
-        if sync :
-            count = count +1
-    return count
+# async def get_acknowledged_replicas():
+#     count=0
+#     for _,sync in ReplicaList.items():  
+#         if sync :
+#             count = count +1
+#     return count
+
+async def propagate_getack_command(no_of_awaited_replicas,timeout,waittime):
+    print("!!! inside propagate_getack_command !!!!")
+                    
+    cmd_encoded= b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n'
+    no_of_ack_replicas=0
+    # sleepfor=waittime/3
+    replica_temp_list=list(RedisAsyncServer.server.ReplicaList.keys())    
+    while (no_of_ack_replicas< no_of_awaited_replicas or datetime.now(timezone.utc) <timeout):        
+        for s_writer in RedisAsyncServer.server.ReplicaList.keys():
+            if s_writer in replica_temp_list:
+                if not RedisAsyncServer.server.ReplicaList[s_writer][1]:
+                    s_writer.write(cmd_encoded)
+                    await s_writer.drain()            
+                    curr_offset=RedisAsyncServer.server.ReplicaList[s_writer][0]
+                    # server side update of offset
+                    RedisAsyncServer.server.ReplicaList[s_writer][0] = curr_offset+len(cmd_encoded)
+                    RedisAsyncServer.server.ReplicaList[s_writer][1] = False
+                    print("server updated offset of replica =",curr_offset,RedisAsyncServer.server.ReplicaList[s_writer][0])
+                else:
+                    print("!!! one replica offset matched !!!!")
+                    no_of_ack_replicas +=1
+                    if no_of_awaited_replicas == no_of_ack_replicas:
+                        return no_of_awaited_replicas
+                    replica_temp_list.remove(s_writer)
+        await asyncio.sleep(2)
+            # s_reader=ReplicaList[s_writer][1]
+            # input_query=await s_reader.read(1024)
+            # input_tokens=input_query.decode().splitlines()
+            # if input_tokens[1].upper()=='REPLCONF' and input_tokens[3].upper()=='ACK':
+            #     replica_offset = int(input_tokens[2])
+            #     if replica_offset == ReplicaList[s_writer][0] :
+            #         print("!!! one replica offset matched !!!!")
+            #         no_of_ack_replicas +=1
+            #         del replica_list_dict[s_writer]
+    return no_of_ack_replicas
+
+            
+
+
+                    
+                    
      
     
 
 async def command_handler(writer,client_addr,server_role,query_string,input_tokens):
     input_tokens=query_string.splitlines()
+    print('>>>>inside command_handler<<<<<')
+    print(input_tokens)
     no_of_elements=int(input_tokens[0].lstrip('*'))               
     data_list=[]
 
@@ -369,30 +420,26 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 no_of_ack_replicas=0
                 current_time = datetime.now(timezone.utc)
                 timeout=current_time+timedelta(milliseconds=wait_command_timeout)
-                while no_of_ack_replicas< no_of_awaited_replicas or datetime.now(timezone.utc) <timeout:
-                    command='*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n'
-                    CommandDeque.append(command)
-                    print("added to CommandDeque=",CommandDeque)
-                    await propagate_command()
+                no_of_ack_replicas=await propagate_getack_command(no_of_awaited_replicas,timeout,wait_command_timeout)
 
-                    no_of_ack_replicas= await get_acknowledged_replicas()
+                # no_of_ack_replicas= await get_acknowledged_replicas()
 
                     #send REPLCONF GETACK * to each replica in replicalist
                     #get the offset back
                     #match with offset in replicalist
                     
-                
+                print("sending response from WAIT")
                 response=f':{no_of_ack_replicas}\r\n'
                 # writer.write(response.encode())
                 # await writer.drain() 
-        elif data_list[0].upper()=='REPLCONF' and data_list[1].upper()=='ACK':
-            replica_offset = int(data_list[2])
-            if replica_offset == ReplicaList[writer][0] :
-                ReplicaList[writer][1] =True
-            else:
-                ReplicaList[writer][1] =False  
-            print("Processed REPLCONF ACK")  
-            response='REPLCONF ACK'
+        # elif data_list[0].upper()=='REPLCONF' and data_list[1].upper()=='ACK':
+            # replica_offset = int(data_list[2])
+            # if replica_offset == ReplicaList[writer][0] :
+            #     ReplicaList[writer][1] =True
+            # else:
+            #     ReplicaList[writer][1] =False  
+            # print("Processed REPLCONF ACK")  
+            # response='REPLCONF ACK'
                           
         elif data_list[0] == 'INCR': 
             key =data_list[1]
@@ -820,7 +867,19 @@ async def client_handler(reader,writer):
                     writer.write(response)
                     await writer.drain() 
                     continue  
-            if 'REPLCONF'  in input_tokens:
+            if 'REPLCONF' in input_tokens and 'ACK' in input_tokens and RedisAsyncServer.role == 'master':
+                print("sever received offset")
+                print(input_tokens)
+                replica_offset = int(input_tokens[6]) + len(b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n')
+                
+                offset_by_master=RedisAsyncServer.server.ReplicaList[writer][0] 
+                print("offset by replica =",replica_offset)
+                print("offset by master =",offset_by_master)
+                if replica_offset == offset_by_master:
+                    print("!!! one replica offset matched !!!!")
+                    RedisAsyncServer.server.ReplicaList[writer][1] =True
+                continue 
+            elif 'REPLCONF'  in input_tokens:
                 if RedisAsyncServer.role == 'master':
                     response=f"+OK\r\n"
                     writer.write(response.encode())
@@ -839,9 +898,10 @@ async def client_handler(reader,writer):
                     writer.write(in_bytes)
                     await writer.drain()
                     #adding replica and its command offset
-                    ReplicaList[writer]=[0,True]
                     
-                    print("$$$$$$ ADDED to ReplicaList$$$$$",ReplicaList[writer])
+                    RedisAsyncServer.server.ReplicaList[writer]=[0,True]
+                    
+                    print("$$$$$$ server ADDED to ReplicaList and set offet to 0$$$$$")
                     continue 
             
             # if 'WAIT' in input_tokens or 'wait' in input_tokens:
@@ -859,12 +919,16 @@ async def client_handler(reader,writer):
             except Exception as e:
                 print("EXCEPTION=",e)
             if input_tokens[2] == 'SET':
+                new_cmd_str=''
+                new_cmd_str='\r\n'.join(input_tokens)+'\r\n'
                 if RedisAsyncServer.role == 'master' :
-                    CommandDeque.append(query_string)
+                    CommandDeque.append(new_cmd_str)
                     print("added to CommandDeque=",CommandDeque)
                     await propagate_command()
                     query_string=''
             if not response == 'REPLCONF ACK':
+                print("response from client handler")
+                print("for command :",input_tokens)
                 writer.write(response.encode())
                 await writer.drain() 
             if not CONNECT:
@@ -923,12 +987,15 @@ async def command_propagation_handler():
                 
                 query_string=str(command.decode()) 
                 if command == b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n' or command == b'*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n' :
+                    print('gectack found !!!!!command_offset is ',command_offset)
                     response=f'*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n${len(str(command_offset))}\r\n{str(command_offset)}\r\n'  
                     m_writer.write(response.encode())  
                     await m_writer.drain() 
+                    print('offset send to master for getack')
                     command_len=len(command)
                     command_offset=command_offset + command_len
                     RedisAsyncServer.server.replica_command_offset = command_offset
+                    print("slave adding getack offset",command_offset)
                     command_len=0
                     continue     
                 input_tokens=query_string.splitlines()
@@ -940,6 +1007,8 @@ async def command_propagation_handler():
                         length_list.append(int(token.lstrip('*')))             
                         continue
                     if token.startswith('$') and token.strip() != '$':
+                        continue
+                    if token.strip() == '+OK' :
                         continue
                     data_lists.append(token.strip())
                 print("data_list:",data_lists)
@@ -975,17 +1044,21 @@ async def command_propagation_handler():
 
                         command_string=f'*{len(data_list)}\r\n'+command_string
                         command_len=len(command_string.encode())
+                        print("SET string",command_string)
+                        print("SET offset",command_len)
                         command_offset=command_offset+command_len
                         RedisAsyncServer.server.replica_command_offset = command_offset
+                        print("slave adding SET offset",command_offset)
                         command_len=0
                         print(f'slave set the new value !!!!',RedisAsyncServer.data_store[key].data)
                     elif data_list[0].upper() == 'REPLCONF' and data_list[1].upper() == 'GETACK': 
-                        response=f'*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n${len(str(command_offset))}\r\n{str(command_offset)}\r\n'  
+                        response=f'*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n${len(str(RedisAsyncServer.server.replica_command_offset))}\r\n{str(RedisAsyncServer.server.replica_command_offset)}\r\n'  
                         m_writer.write(response.encode())  
                         await m_writer.drain() 
-                        command_len=37
+                        command_len=len(b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n')
                         command_offset=command_offset + command_len
                         RedisAsyncServer.server.replica_command_offset = command_offset
+                        print("slave adding offset getack",command_offset)
                         command_len=0
                         continue     
                     elif data_list[0].upper() == 'PING' :
@@ -995,6 +1068,7 @@ async def command_propagation_handler():
                         command_len=14
                         command_offset=command_offset + command_len
                         RedisAsyncServer.server.replica_command_offset = command_offset
+                        print("slave adding PING offset",command_offset)
                         command_len=0
                         continue     
 
