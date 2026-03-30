@@ -344,7 +344,7 @@ async def propagate_getack_command(no_of_awaited_replicas,timeout,waittime):
                     if no_of_awaited_replicas == no_of_ack_replicas:
                         return no_of_awaited_replicas
                     replica_temp_list.remove(s_writer)
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
             # s_reader=ReplicaList[s_writer][1]
             # input_query=await s_reader.read(1024)
             # input_tokens=input_query.decode().splitlines()
