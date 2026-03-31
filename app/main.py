@@ -298,23 +298,22 @@ async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
 async def propagate_command():
     while len(CommandDeque)>0:
         command_str=CommandDeque.popleft()
-        print(">>>PROPAGATING>>>>writer status ",command_str)
+        # print(">>>PROPAGATING>>>>writer status ",command_str)
         cmd_encoded=command_str.encode()
         for s_writer in RedisAsyncServer.server.ReplicaList.keys():             
             s_writer.write(cmd_encoded)
             await s_writer.drain()            
             curr_offset=RedisAsyncServer.server.ReplicaList[s_writer][0]
-            print("server side offset of replica =",curr_offset)
+            # print("server side offset of replica =",curr_offset)
             # server side update of offset
             RedisAsyncServer.server.ReplicaList[s_writer][0] = curr_offset+len(cmd_encoded)
-            print("server side  new offset of replica =",RedisAsyncServer.server.ReplicaList[s_writer][0])
+            # print("server side  new offset of replica =",RedisAsyncServer.server.ReplicaList[s_writer][0])
             
             RedisAsyncServer.server.ReplicaList[s_writer][1]=False
             print("Updated offset and sync to false by master")
             # await asyncio.sleep(0.001)
 
 async def process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaited_replicas):
-    print("!!! inside process_synced_replicas !!!!")  
     for s_writer in RedisAsyncServer.server.ReplicaList.keys():
         if s_writer in replica_temp_list:
             if RedisAsyncServer.server.ReplicaList[s_writer][1]:
@@ -326,7 +325,6 @@ async def process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaite
     return synced_replicas,replica_temp_list
 
 async def propagate_getack_command(replica_temp_list):
-    print("!!! inside propagate_getack_command !!!!")                    
     cmd_encoded= b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n'
     for s_writer in RedisAsyncServer.server.ReplicaList.keys():
         if s_writer in replica_temp_list:                
@@ -336,45 +334,34 @@ async def propagate_getack_command(replica_temp_list):
             # server side update of offset
             RedisAsyncServer.server.ReplicaList[s_writer][0] = curr_offset+len(cmd_encoded)
             RedisAsyncServer.server.ReplicaList[s_writer][1] = False
-    print("propagate_getack_command completed")
         
     
 
             
 async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
     replica_temp_list=list(RedisAsyncServer.server.ReplicaList.keys()) 
-    synced_replicas=0
-    synced_replicas, replica_temp_list = await process_synced_replicas(
-            synced_replicas,
-            replica_temp_list,
-            no_of_awaited_replicas
-        )
-    if synced_replicas>=no_of_awaited_replicas:
-        print("matched synced_replicas ")
-        return no_of_awaited_replicas
-    if datetime.now(timezone.utc) >= timeout:
-        print("TIME OUT in get_ack_replicas ")
-        return synced_replicas
-    # while CommandDeque:
-    #     await asyncio.sleep(0.001)
-    await propagate_getack_command(replica_temp_list)
-    
+    synced_replicas=0    
     while True:
+        if CommandDeque:
+            await asyncio.sleep(0.001)
+        else:
+            break
+    SENDACK=True    
+    while datetime.now(timezone.utc) < timeout:
         
-        synced_replicas, replica_temp_list = await process_synced_replicas(
-            synced_replicas,
-            replica_temp_list,
-            no_of_awaited_replicas
-        )
-        
+        synced_replicas,replica_temp_list=await process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaited_replicas)
+           
         if synced_replicas>=no_of_awaited_replicas:
             print("matched synced_replicas ")
             return no_of_awaited_replicas
         if datetime.now(timezone.utc) >= timeout:
             print("TIME OUT in get_ack_replicas ")
             return synced_replicas
+        if SENDACK:
+            await propagate_getack_command(replica_temp_list)
+            SENDACK=False
         await asyncio.sleep(0.001)
-        
+    return synced_replicas    
 
     
     # while synced_replicas < no_of_awaited_replicas : 
@@ -453,7 +440,6 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 timeout=current_time+timedelta(milliseconds=wait_command_timeout)
                 no_of_ack_replicas=await get_ack_replicas(no_of_awaited_replicas,timeout,wait_command_timeout)
                 print("sending response from WAIT :",no_of_ack_replicas)                
-                print("sending response from WAIT")
                 response=f':{no_of_ack_replicas}\r\n'
                 # writer.write(response.encode())
                 # await writer.drain() 
@@ -893,13 +879,11 @@ async def client_handler(reader,writer):
                     await writer.drain() 
                     continue  
             if 'REPLCONF' in input_tokens and 'ACK' in input_tokens and RedisAsyncServer.role == 'master':
-                print("sever received offset")
-                print(input_tokens)
                 replica_offset = int(input_tokens[6]) + len(b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n')
                 
                 offset_by_master=RedisAsyncServer.server.ReplicaList[writer][0] 
-                print("offset by replica =",replica_offset)
-                print("offset by master =",offset_by_master)
+                # print("offset by replica =",replica_offset)
+                # print("offset by master =",offset_by_master)
                 if replica_offset == offset_by_master:
                     print("!!! one replica offset matched !!!!")
                     RedisAsyncServer.server.ReplicaList[writer][1] =True
