@@ -343,8 +343,22 @@ async def propagate_getack_command(replica_temp_list):
             
 async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
     replica_temp_list=list(RedisAsyncServer.server.ReplicaList.keys()) 
-    await propagate_getack_command(replica_temp_list)
     synced_replicas=0
+    synced_replicas, replica_temp_list = await process_synced_replicas(
+            synced_replicas,
+            replica_temp_list,
+            no_of_awaited_replicas
+        )
+    if synced_replicas>=no_of_awaited_replicas:
+        print("matched synced_replicas ")
+        return no_of_awaited_replicas
+    if datetime.now(timezone.utc) >= timeout:
+        print("TIME OUT in get_ack_replicas ")
+        return synced_replicas
+    # while CommandDeque:
+    #     await asyncio.sleep(0.001)
+    await propagate_getack_command(replica_temp_list)
+    
     while True:
         
         synced_replicas, replica_temp_list = await process_synced_replicas(
