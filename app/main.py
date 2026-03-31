@@ -345,20 +345,35 @@ async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
     replica_temp_list=list(RedisAsyncServer.server.ReplicaList.keys()) 
     await propagate_getack_command(replica_temp_list)
     synced_replicas=0
-    
-    while synced_replicas < no_of_awaited_replicas : 
-        while datetime.now(timezone.utc) < timeout:
-            synced_replicas,replica_temp_list=await process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaited_replicas)
-            # print("synced_replicas : ",synced_replicas)
-            if synced_replicas==no_of_awaited_replicas:
-                print("synced_replicas : ",synced_replicas)
-                return no_of_awaited_replicas
-            else:
-                await asyncio.sleep(0.001)  
-    print("synced_replicas :timeout ",synced_replicas)       
-    return synced_replicas
+    while True:
+        if datetime.now(timezone.utc) >= timeout:
+            print("TIME OUT in get_ack_replicas ")
+            return synced_replicas
+        synced_replicas, replica_temp_list = await process_synced_replicas(
+            synced_replicas,
+            replica_temp_list,
+            no_of_awaited_replicas
+        )
+        
+        if synced_replicas>=no_of_awaited_replicas:
+            print("matched synced_replicas ")
+            return no_of_awaited_replicas
+        await asyncio.sleep(0.001)
+        
 
     
+    # while synced_replicas < no_of_awaited_replicas : 
+    #     while datetime.now(timezone.utc) < timeout:
+    #         synced_replicas,replica_temp_list=await process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaited_replicas)
+    #         # print("synced_replicas : ",synced_replicas)
+    #         if synced_replicas==no_of_awaited_replicas:
+    #             print("synced_replicas : ",synced_replicas)
+    #             return no_of_awaited_replicas
+    #         else:
+    #             await asyncio.sleep(0.001)  
+    # print("synced_replicas :timeout ",synced_replicas)       
+    # return synced_replicas
+ 
 
                     
                     
@@ -422,13 +437,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 current_time = datetime.now(timezone.utc)
                 timeout=current_time+timedelta(milliseconds=wait_command_timeout)
                 no_of_ack_replicas=await get_ack_replicas(no_of_awaited_replicas,timeout,wait_command_timeout)
-                print("sending response from WAIT :",no_of_ack_replicas)
-                # no_of_ack_replicas= await get_acknowledged_replicas()
-
-                    #send REPLCONF GETACK * to each replica in replicalist
-                    #get the offset back
-                    #match with offset in replicalist
-                    
+                print("sending response from WAIT :",no_of_ack_replicas)                
                 print("sending response from WAIT")
                 response=f':{no_of_ack_replicas}\r\n'
                 # writer.write(response.encode())
