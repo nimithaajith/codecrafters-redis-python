@@ -318,10 +318,7 @@ async def process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaite
         if s_writer in replica_temp_list:
             if RedisAsyncServer.server.ReplicaList[s_writer][1]:
                 synced_replicas += 1
-                if synced_replicas == no_of_awaited_replicas:
-                    return no_of_awaited_replicas,replica_temp_list
-                else:
-                    replica_temp_list.remove(s_writer)
+                replica_temp_list.remove(s_writer)
     return synced_replicas,replica_temp_list
 
 async def propagate_getack_command(replica_temp_list):
@@ -353,7 +350,7 @@ async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
            
         if synced_replicas>=no_of_awaited_replicas:
             print("matched synced_replicas ")
-            return no_of_awaited_replicas
+            return synced_replicas
         if datetime.now(timezone.utc) >= timeout:
             print("TIME OUT in get_ack_replicas ")
             return synced_replicas
