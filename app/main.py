@@ -432,7 +432,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     response=f'*2\r\n$3\r\ndir\r\n${len(rdb_dir)}\r\n{rdb_dir}\r\n'
                 elif data_list[2].lower() == 'dbfilename':
                     rdb_filename=RedisAsyncServer.server.rdb_filename
-                    response=f'*2\r\n$10\r\dbfilename\r\n${len(rdb_filename)}\r\n{rdb_filename}\r\n'
+                    response=f'*2\r\n$10\r\ndbfilename\r\n${len(rdb_filename)}\r\n{rdb_filename}\r\n'
 
         elif data_list[0] == 'SET':
             print("Inside SET , query_string",query_string)
@@ -816,8 +816,8 @@ async def client_handler(reader,writer):
         
         print("Connected...",client_addr,RedisAsyncServer.role) 
         CONNECT = True
-        if RedisAsyncServer.sever.rdb_dir is not None and RedisAsyncServer.sever.rdb_filename is not None:
-            filepath=os.path.join(RedisAsyncServer.sever.rdb_dir,RedisAsyncServer.sever.rdb_filename)
+        if RedisAsyncServer.server.rdb_dir is not None and RedisAsyncServer.server.rdb_filename is not None:
+            filepath=os.path.join(RedisAsyncServer.server.rdb_dir,RedisAsyncServer.server.rdb_filename)
             if os.path.exists(filepath):
                 with open(filepath,'rb') as rdbfile:
                     rdb_bytes=rdbfile.read()
