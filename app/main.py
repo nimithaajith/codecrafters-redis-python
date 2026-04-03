@@ -820,7 +820,7 @@ async def client_handler(reader,writer):
             filepath=os.path.join(RedisAsyncServer.server.rdb_dir,RedisAsyncServer.server.rdb_filename)
             if os.path.exists(filepath):
                 with open(filepath,'rb') as rdbfile:
-                    print("<<<<<FILE EXISTS , reading....>>>>")
+                    print("<<<<<FILE EXISTS , reading....>>>>",filepath)
                     rdb_bytes=rdbfile.read()
                     json_str = rdb_bytes.decode()
                     RedisAsyncServer.data_store=json.loads(json_str)
