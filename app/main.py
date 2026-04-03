@@ -3,6 +3,8 @@ from datetime import timezone,timedelta,datetime
 import time
 import threading
 from collections import deque,defaultdict
+import os
+import json
 
 class RedisServer():
     def __init__(self,role='master',port=6379):
@@ -22,13 +24,24 @@ class Replica():
 
 class Master():
     def __init__(self):
-        rdb_filename=None
-        rdb_dir=None
+        self.rdb_filename=None
+        self.rdb_dir=None
         self.master_replid = ''
         self.master_repl_offset=None
         # dict of Lists,key is slave-writer,value is list(replica's offset,sync)
         # sync is true means replica's offset and  replica server's replica_command_offset are same
         self.ReplicaList={}
+
+    async def save(self):
+        os.makedirs(self.rdb_dir, exist_ok=True)
+        filepath=os.path.join(self.rdb_dir,self.rdb_filename)
+        tempfilepath=os.path.join(self.rdb_dir,'temp'+self.rdb_filename)
+        json_str=json.dumps(RedisAsyncServer.data_store,ensure_ascii=False)
+        json_bytes=json_str.encode('utf-8')
+        with open(tempfilepath,'wb') as f:
+            f.write(json_bytes)
+        os.replace(tempfilepath, filepath)
+        
 
     
 
@@ -803,6 +816,13 @@ async def client_handler(reader,writer):
         
         print("Connected...",client_addr,RedisAsyncServer.role) 
         CONNECT = True
+        if RedisAsyncServer.sever.rdb_dir is not None and RedisAsyncServer.sever.rdb_filename is not None:
+            filepath=os.path.join(RedisAsyncServer.sever.rdb_dir,RedisAsyncServer.sever.rdb_filename)
+            if os.path.exists(filepath):
+                with open(filepath,'rb') as rdbfile:
+                    rdb_bytes=rdbfile.read()
+                    json_str = rdb_bytes.decode("utf-8")
+                    RedisAsyncServer.data_store=json.loads(json_str)
         # multi command enabled, queue to hold upcoming commands
         MULTI=[False,deque()]
         while CONNECT:
@@ -811,6 +831,15 @@ async def client_handler(reader,writer):
                 await asyncio.sleep(0.2)
                 continue
             query_string=str(input_query.decode()) 
+            print(">>>>>>>query_string : ",query_string)
+            if query_string == '*2\r\n$4\r\nKEYS\r\n$3\r\n"*"\r\n':
+                if RedisAsyncServer.data_store:
+                    response=f'*{len(RedisAsyncServer.data_store)}\r\n'
+                    for key in RedisAsyncServer.data_store.keys():
+                        response=response+f'${len(key)}\r\n{key}\r\n'
+                writer.write(response.encode())
+                await writer.drain() 
+                continue 
             # print('RECEIVED = ',query_string)
             input_tokens=query_string.splitlines()
             if 'info' in input_tokens or 'INFO' in input_tokens:
@@ -940,9 +969,9 @@ async def client_handler(reader,writer):
                 new_cmd_str='\r\n'.join(input_tokens)+'\r\n'
                 if RedisAsyncServer.role == 'master' :
                     CommandDeque.append(new_cmd_str)
-                    print("added to CommandDeque=",CommandDeque)
                     await propagate_command()
                     query_string=''
+                    await RedisAsyncServer.server.save()                    
             if not response == 'REPLCONF ACK':
                 print("response from client handler")
                 print("for command :",input_tokens)
