@@ -33,7 +33,7 @@ class Master():
         # sync is true means replica's offset and  replica server's replica_command_offset are same
         self.ReplicaList={}
 
-    async def save(self):
+    def save(self):
         try:
             os.makedirs(self.rdb_dir, exist_ok=True)
             filepath=os.path.join(self.rdb_dir,self.rdb_filename)
