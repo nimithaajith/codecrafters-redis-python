@@ -38,7 +38,9 @@ class Master():
             os.makedirs(self.rdb_dir, exist_ok=True)
             filepath=os.path.join(self.rdb_dir,self.rdb_filename)
             basedir="C:\\Users\\Ardra\\codecrafters-redis-python"
-            tempfilepath=os.path.join(basedir,self.rdb_filename)       
+            os.makedirs(basedir, exist_ok=True)  
+            tempfilepath=os.path.join(basedir,self.rdb_filename)  
+               
             with open(tempfilepath,'wb') as dst,open(filepath,'rb') as src:
                 shutil.copyfileobj(src, dst) 
             with open(tempfilepath,'rb') as rdbfile:                
