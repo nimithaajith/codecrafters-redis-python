@@ -5,7 +5,7 @@ import threading
 from collections import deque,defaultdict
 import os
 import json
-
+import shutil
 class RedisServer():
     def __init__(self,role='master',port=6379):
         self.port= port
@@ -28,20 +28,40 @@ class Master():
         self.rdb_dir=None
         self.master_replid = ''
         self.master_repl_offset=None
+        
         # dict of Lists,key is slave-writer,value is list(replica's offset,sync)
         # sync is true means replica's offset and  replica server's replica_command_offset are same
         self.ReplicaList={}
 
     async def save(self):
-        os.makedirs(self.rdb_dir, exist_ok=True)
-        filepath=os.path.join(self.rdb_dir,self.rdb_filename)
-        tempfilepath=os.path.join(self.rdb_dir,'temp'+self.rdb_filename)
-        json_str=json.dumps(RedisAsyncServer.data_store,ensure_ascii=False)
-        json_bytes=json_str.encode('utf-8')
-        with open(tempfilepath,'wb') as f:
-            f.write(json_bytes)
-        os.replace(tempfilepath, filepath)
-        
+        try:
+            os.makedirs(self.rdb_dir, exist_ok=True)
+            filepath=os.path.join(self.rdb_dir,self.rdb_filename)
+            tempfilepath=f"C:\Users\Ardra\codecrafters-redis-python\{self.rdb_filename}"        
+            with open(tempfilepath,'wb') as dst,open(filepath,'rb') as src:
+                shutil.copyfileobj(src, dst) 
+            with open(tempfilepath,'rb') as rdbfile:
+                val = rdbfile.read(5) 
+                while val:
+                    print("----->",val) 
+                    val=rdbfile.read(1) 
+                    if not val:
+                        break
+
+                # if line1 == '52 45 44 49 53' :
+                #     eof=False
+                #     while not eof:
+                #         val = rdbfile.read(1)
+
+                #         if val == 'FE' or val == '0xFE':
+                #             newdb=True
+                #             break
+                #     if newdb:
+
+
+                         
+        except Exception as e:
+            print("Exception during rdb file save :: ",e)    
 
     
 
@@ -816,14 +836,7 @@ async def client_handler(reader,writer):
         
         print("Connected...",client_addr,RedisAsyncServer.role) 
         CONNECT = True
-        if RedisAsyncServer.server.rdb_dir is not None and RedisAsyncServer.server.rdb_filename is not None:
-            filepath=os.path.join(RedisAsyncServer.server.rdb_dir,RedisAsyncServer.server.rdb_filename)
-            if os.path.exists(filepath):
-                with open(filepath,'rb') as rdbfile:
-                    print("<<<<<FILE EXISTS , reading....>>>>",filepath)
-                    rdb_bytes=rdbfile.read()
-                    json_str = rdb_bytes.decode()
-                    RedisAsyncServer.data_store=json.loads(json_str)
+        
         # multi command enabled, queue to hold upcoming commands
         MULTI=[False,deque()]
         while CONNECT:
@@ -1195,6 +1208,9 @@ def main():
     if RedisAsyncServer.role=='master':
         RedisAsyncServer.server.master_replid = '8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb'
         RedisAsyncServer.server.master_repl_offset = 0
+        if RedisAsyncServer.server.rdb_dir and RedisAsyncServer.server.rdb_filename:
+            RedisAsyncServer.server.save()
+            
     print("Execution starts here....!role=",RedisAsyncServer.role, master_details)
 
     # server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
