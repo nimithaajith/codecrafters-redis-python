@@ -37,17 +37,19 @@ class Master():
         try:
             os.makedirs(self.rdb_dir, exist_ok=True)
             filepath=os.path.join(self.rdb_dir,self.rdb_filename)
-            basedir="C:\Users\Ardra\codecrafters-redis-python"
+            basedir="C:\\Users\\Ardra\\codecrafters-redis-python"
             tempfilepath=os.path.join(basedir,self.rdb_filename)       
             with open(tempfilepath,'wb') as dst,open(filepath,'rb') as src:
                 shutil.copyfileobj(src, dst) 
-            with open(tempfilepath,'rb') as rdbfile:
-                val = rdbfile.read(5) 
-                while val:
-                    print("----->",val) 
-                    val=rdbfile.read(1) 
-                    if not val:
-                        break
+            with open(tempfilepath,'rb') as rdbfile:                
+                while chunk := rdbfile.read(1024):
+                    print(chunk)
+                # val = rdbfile.read(5) 
+                # while val:
+                #     print("----->",val) 
+                #     val=rdbfile.read(1) 
+                #     if not val:
+                #         break
 
                 # if line1 == '52 45 44 49 53' :
                 #     eof=False
