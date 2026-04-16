@@ -68,6 +68,8 @@ def initialize_data_store():
                 if data == b'\xff':
                     break
                 if data == b'\xfd':
+                    print(">>>>non Expire timestamp in seconds key-value found")
+                    
                     #Expire timestamp in seconds (4-byte unsigned integer)
                     expires_on_sec = int.from_bytes(rdbfile.read(4), byteorder='little', signed=False)
                     expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_on_sec)                
@@ -80,6 +82,7 @@ def initialize_data_store():
                     create=True
                     
                 elif data == b'\xfc' :
+                    print(">>>>non Expire timestamp in milliseconds key-value found")
                     #Expire timestamp in milliseconds (8-byte unsigned long)
                     expires_on_sec = int.from_bytes(rdbfile.read(8), byteorder='little', signed=False)
                     expiry = datetime.now(timezone.utc) + timedelta(milliseconds=expires_on_sec)
@@ -91,6 +94,7 @@ def initialize_data_store():
                     val=rdbfile.read(val_len).decode()
                     create=True
                 elif data == b'\x00' :
+                    print(">>>>non expiriny key-value found")
                     # data without expiry
                     expiry=None
                     bytetype=rdbfile.read(1)
