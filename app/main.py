@@ -1247,7 +1247,7 @@ def main():
         RedisAsyncServer.server.master_replid = '8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb'
         RedisAsyncServer.server.master_repl_offset = 0
         if RedisAsyncServer.server.rdb_dir and RedisAsyncServer.server.rdb_filename:
-            RedisAsyncServer.server.initialize_data_store()
+            initialize_data_store()
             
     print("Execution starts here....!role=",RedisAsyncServer.role, master_details)
 
