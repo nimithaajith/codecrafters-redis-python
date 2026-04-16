@@ -96,6 +96,7 @@ def initialize_data_store():
                     val=rdbfile.read(val_len).decode()                      
                     create=True              
                 if create:
+                    print(f"saving >>>>{key}={val} of type {type} expire@{expiry}")
                     RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type)  
                                        
     except Exception as e:
