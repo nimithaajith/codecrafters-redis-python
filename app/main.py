@@ -98,9 +98,10 @@ def initialize_data_store():
                     # data without expiry
                     expiry=None
                     bytetype=rdbfile.read(1)
-                    bytekeylen=rdbfile.read(1)
                     value_type= bytetype[0]
                     type = RedisAsyncServer.server.get_type(value_type)
+                    print("type = ",type)
+                    bytekeylen=rdbfile.read(1)
                     print("bytekeylen = ",bytekeylen)
                     key_len=bytekeylen[0]
                     bytekey=rdbfile.read(key_len)
