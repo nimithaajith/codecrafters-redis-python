@@ -53,7 +53,8 @@ def initialize_data_store():
         with open(tempfilepath,'wb') as dst,open(filepath,'rb') as src:
             shutil.copyfileobj(src, dst) 
         # b'REDIS0011\xfa\tredis-ver\x057.2.0\xfa\nredis-bits\xc0@\xfe\x00\xfb\x01\x00\x00\x05mango\x06orange\xff\xeb)\xe1\xcfp\x08\x1f\x9a'
-
+        with open(tempfilepath,'rb') as rdbfile:
+            print(rdbfile.read(1024))
         with open(tempfilepath,'rb') as rdbfile: 
             chunk = rdbfile.read(5)  
             if chunk == b'REDIS' :
