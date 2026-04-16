@@ -101,15 +101,21 @@ def initialize_data_store():
                     bytekeylen=rdbfile.read(1)
                     value_type= bytetype[0]
                     type = RedisAsyncServer.server.get_type(value_type)
+                    print("bytekeylen = ",bytekeylen)
                     key_len=bytekeylen[0]
                     bytekey=rdbfile.read(key_len)
+                    print("bytekey= ",bytekey)
                     key=bytekey.decode()
                     val_len=rdbfile.read(1)[0]
-                    val=rdbfile.read(val_len).decode() 
+                    byteval=rdbfile.read(val_len)
+                    print("byteval= ",byteval)
+                    val=byteval.decode() 
                                          
                     create=True              
                 if create:
-                    RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type)  
+                    RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
+                    print('=======saved========') 
+                    print(RedisAsyncServer.data_store[key]) 
                                        
     except Exception as e:
         print("Exception during rdb file save :: ",e)    
