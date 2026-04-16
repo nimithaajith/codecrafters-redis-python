@@ -57,14 +57,19 @@ def initialize_data_store():
         with open(tempfilepath,'rb') as rdbfile: 
             chunk = rdbfile.read(5)  
             if chunk == b'REDIS' :
-                print("Reading rdb file, REDIS found !!")            
+                print("Reading rdb file, REDIS found !!")  
+            while i := rdbfile.read(1):
+                if i==b'\xfe':
+                    i=rdbfile.read(1)
+                    break
+
             while data := rdbfile.read(1):
                 create=False
                 if data == b'\xff':
                     break
                 if data == b'\xfd':
                     #Expire timestamp in seconds (4-byte unsigned integer)
-                    expires_on_sec=float(rdbfile.read(4).decode())
+                    expires_on_sec = int.from_bytes(rdbfile.read(4), byteorder='little', signed=False)
                     expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_on_sec)                
                     value_type= rdbfile.read(1)[0]
                     type = RedisAsyncServer.server.get_type(value_type)
@@ -76,7 +81,7 @@ def initialize_data_store():
                     
                 elif data == b'\xfc' :
                     #Expire timestamp in milliseconds (8-byte unsigned long)
-                    expires_on_sec=float(rdbfile.read(8).decode())
+                    expires_on_sec = int.from_bytes(rdbfile.read(8), byteorder='little', signed=False)
                     expiry = datetime.now(timezone.utc) + timedelta(milliseconds=expires_on_sec)
                     value_type= rdbfile.read(1)[0]
                     type = RedisAsyncServer.server.get_type(value_type)
@@ -94,10 +99,10 @@ def initialize_data_store():
                     value_type= bytetype[0]
                     type = RedisAsyncServer.server.get_type(value_type)
                     key_len=bytekeylen[0]
-                    bytekey=rdbfile.read(int(key_len,16))
+                    bytekey=rdbfile.read(key_len)
                     key=bytekey.decode()
-                    val_len=rdbfile.read(1).decode('utf-8')
-                    val=rdbfile.read(int(val_len,16)).decode('utf-8') 
+                    val_len=rdbfile.read(1)[0]
+                    val=rdbfile.read(val_len).decode() 
                                          
                     create=True              
                 if create:
