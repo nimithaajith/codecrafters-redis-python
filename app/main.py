@@ -89,11 +89,11 @@ def initialize_data_store():
                     # data without expiry
                     expiry=None
                     bytetype=rdbfile.read(1)
-                    print("type=",bytetype)
+                    print("type=",bytetype[0])
                     bytekeylen=rdbfile.read(1)
-                    value_type= bytetype.decode('utf-8')
-                    type = RedisAsyncServer.server.get_type(int(value_type,16))
-                    key_len=bytekeylen.decode('utf-8')
+                    value_type= bytetype[0]
+                    type = RedisAsyncServer.server.get_type(value_type)
+                    key_len=bytekeylen[0]
                     bytekey=rdbfile.read(int(key_len,16))
                     key=bytekey.decode()
                     val_len=rdbfile.read(1).decode('utf-8')
