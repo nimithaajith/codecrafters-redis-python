@@ -88,13 +88,17 @@ def initialize_data_store():
                 elif data == b'\x00' :
                     # data without expiry
                     expiry=None
-                    value_type= rdbfile.read(1).decode('utf-8')
+                    bytetype=rdbfile.read(1)
+                    print("type=",bytetype)
+                    bytekeylen=rdbfile.read(1)
+                    value_type= bytetype.decode('utf-8')
                     type = RedisAsyncServer.server.get_type(int(value_type,16))
-                    key_len=rdbfile.read(1).decode('utf-8')
-                    key=rdbfile.read(int(key_len,16)).decode()
+                    key_len=bytekeylen.decode('utf-8')
+                    bytekey=rdbfile.read(int(key_len,16))
+                    key=bytekey.decode()
                     val_len=rdbfile.read(1).decode('utf-8')
                     val=rdbfile.read(int(val_len,16)).decode('utf-8') 
-                    print(f"saving >>>>{key_len}={val_len} of type {value_type} expire@{expiry}")                     
+                                         
                     create=True              
                 if create:
                     print(f"saving >>>>{key}={val} of type {type} expire@{expiry}")
