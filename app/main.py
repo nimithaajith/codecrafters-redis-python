@@ -483,6 +483,23 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             # await writer.drain() 
             # print('###RESPONSE###')
             # print(response)
+        elif data_list[0] == 'KEYS': 
+            if data_list[1] == '*':
+                all_keys=RedisAsyncServer.data_store.keys()
+                response=f'*{len(all_keys)}\r\n'    
+                for k in all_keys:
+                    response=response+f'${len(k)}\r\n{k}\r\n'
+            else:
+                pattern=data_list[1]
+                k_count=0
+                response=''
+                import fnmatch
+                for k in all_keys:
+                    if fnmatch.fnmatch(k, pattern):
+                        response=response+f'${len(k)}\r\n{k}\r\n'
+                        k_count+=1
+                response=f'*{k_count}\r\n'+response
+
         elif data_list[0] == 'CONFIG':
             if data_list[1] == 'GET':
                 if data_list[2].lower() == 'dir':
