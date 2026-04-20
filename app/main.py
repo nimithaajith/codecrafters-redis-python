@@ -74,9 +74,11 @@ def initialize_data_store():
                             expiring_key_count=rdbfile.read(1)[0]
                             break
                     break 
-            if key_count:   
+            if key_count: 
+                k_count= key_count-expiring_key_count  
                 while data := rdbfile.read(1):
                     # create=False
+                    
                     if data == b'\xff':
                         break
                     if expiring_key_count:
@@ -121,7 +123,7 @@ def initialize_data_store():
                         
                     elif data == b'\x00' :
                         print(">>>>non expiriny key-value found")
-                        k_count= key_count-expiring_key_count
+                        
                         # data without expiry
                         expiry=None
                         for i in range(k_count):
