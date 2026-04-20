@@ -115,7 +115,7 @@ def initialize_data_store():
                             if datetime.now(timezone.utc) < expiry :
                                 RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
                                 print('=======saved========') 
-                                print(f'type({type}) --->{key} : {val}') 
+                                print(f'type({type}) --->{key} : {val} expires on {expiry}') 
                             expiring_key_count -=1
                         
                     elif data == b'\x00' :
