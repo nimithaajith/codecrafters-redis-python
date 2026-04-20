@@ -92,9 +92,10 @@ def initialize_data_store():
                             key=rdbfile.read(key_len).decode()
                             val_len=rdbfile.read(1)[0]
                             val=rdbfile.read(val_len).decode()
-                            RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
-                            print('=======saved========') 
-                            print(f'type({type}) --->{key} : {val}') 
+                            if datetime.now(timezone.utc) < expiry :
+                                RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
+                                print('=======saved========') 
+                                print(f'type({type}) --->{key} : {val} expires on {expiry}') 
                             expiring_key_count -=1
                                     
                                             
@@ -111,9 +112,10 @@ def initialize_data_store():
                             key=rdbfile.read(key_len).decode()
                             val_len=rdbfile.read(1)[0]
                             val=rdbfile.read(val_len).decode()
-                            RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
-                            print('=======saved========') 
-                            print(f'type({type}) --->{key} : {val}') 
+                            if datetime.now(timezone.utc) < expiry :
+                                RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
+                                print('=======saved========') 
+                                print(f'type({type}) --->{key} : {val}') 
                             expiring_key_count -=1
                         
                     elif data == b'\x00' :
