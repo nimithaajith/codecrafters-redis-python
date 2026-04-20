@@ -55,6 +55,9 @@ def initialize_data_store():
         # b'REDIS0011\xfa\tredis-ver\x057.2.0\xfa\nredis-bits\xc0@\xfe\x00\xfb\x01\x00\x00\x05mango\x06orange\xff\xeb)\xe1\xcfp\x08\x1f\x9a'
         with open(tempfilepath,'rb') as rdbfile:
             print(rdbfile.read(1024))
+        # tempfilepath='./app/temp.rdb'
+        # with open(tempfilepath,'wb') as rdbfile:
+        #     rdbfile.write(b'REDIS0011\xfa\tredis-ver\x057.2.0\xfa\nredis-bits\xc0@\xfe\x00\xfb\x04\x00\x00\x05grape\x06orange\x00\traspberry\tpineapple\x00\x06orange\x05mango\x00\tblueberry\x06banana\xffue\xb86\xd9\x03\xaa8')
         with open(tempfilepath,'rb') as rdbfile: 
             chunk = rdbfile.read(5)  
             if chunk == b'REDIS' :
@@ -62,9 +65,11 @@ def initialize_data_store():
             key_count=0
             while i := rdbfile.read(1):
                 if i==b'\xfe':
-                    while rdbfile.read(1):
+                    print("New db found !!")  
+                    while i := rdbfile.read(1):
                         if i==b'\xfb':
                             key_count=rdbfile.read(1)[0]
+                            print("Key count= ",key_count)  
                             break
                     break 
             if key_count:   
@@ -102,25 +107,22 @@ def initialize_data_store():
                         print(">>>>non expiriny key-value found")
                         # data without expiry
                         expiry=None
-                        bytetype=rdbfile.read(1)
-                        value_type= bytetype[0]
-                        type = RedisAsyncServer.server.get_type(value_type)
-                        print("type = ",type)
                         for i in range(key_count):
-                            bytekeylen=rdbfile.read(1)
-                            print("bytekeylen = ",bytekeylen)
-                            key_len=bytekeylen[0]
-                            bytekey=rdbfile.read(key_len)
-                            print("bytekey= ",bytekey)
-                            key=bytekey.decode()
+                            bytetype=rdbfile.read(1)
+                            value_type= bytetype[0]
+                            type = RedisAsyncServer.server.get_type(value_type)
+                            # print("type = ",type)
+                            key_len=rdbfile.read(1)[0]
+                            # print("key_len=",key_len)
+                            key=rdbfile.read(key_len).decode()
+                            # print("key= ",key)
                             val_len=rdbfile.read(1)[0]
-                            byteval=rdbfile.read(val_len)
-                            print("byteval= ",byteval)
-                            val=byteval.decode()                                             
-                            
+                            # print("val_len= ",val_len)
+                            val=rdbfile.read(val_len).decode()
+                            # print("val= ",val)                     
                             RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
                             print('=======saved========') 
-                            print(RedisAsyncServer.data_store[key]) 
+                            print(f'type({type}) --->{key} : {val}') 
                                 
                                         
     except Exception as e:
