@@ -85,7 +85,8 @@ def initialize_data_store():
                             
                             #Expire timestamp in seconds (4-byte unsigned integer)
                             expires_on_sec = int.from_bytes(rdbfile.read(4), byteorder='little', signed=False)
-                            expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_on_sec)                
+                            expiry = datetime.fromtimestamp(expires_on_sec,tz=timezone.utc)
+                            # expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_on_sec)                
                             value_type= rdbfile.read(1)[0]
                             type = RedisAsyncServer.server.get_type(value_type)
                             key_len=rdbfile.read(1)[0]
@@ -96,16 +97,16 @@ def initialize_data_store():
                                 RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
                                 print('=======saved========') 
                                 print(f'type({type}) --->{key} : {val} expires on {expiry}') 
-                            expiring_key_count -=1
-                                    
+                            expiring_key_count -=1                                  
                                             
                             
                             
                         elif data == b'\xfc' :
                             print(">>>Expire timestamp in milliseconds key-value found")
                             #Expire timestamp in milliseconds (8-byte unsigned long)
-                            expires_on_sec = int.from_bytes(rdbfile.read(8), byteorder='little', signed=False)
-                            expiry = datetime.now(timezone.utc) + timedelta(milliseconds=expires_on_sec)
+                            expires_on_msec = int.from_bytes(rdbfile.read(8), byteorder='little', signed=False)
+                            expiry = datetime.fromtimestamp(expires_on_msec / 1000,tz=timezone.utc)
+                            # expiry = datetime.now(timezone.utc) + timedelta(milliseconds=expires_on_sec)
                             value_type= rdbfile.read(1)[0]
                             type = RedisAsyncServer.server.get_type(value_type)
                             key_len=rdbfile.read(1)[0]
