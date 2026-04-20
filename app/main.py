@@ -121,13 +121,13 @@ def initialize_data_store():
                                 print(f'type({type}) --->{key} : {val} expires on {expiry}') 
                             expiring_key_count -=1
                         
-                    elif data == b'\x00' :
+                    else :
                         print(">>>>non expiriny key-value found")
                         
                         # data without expiry
                         expiry=None
-                        for i in range(k_count):
-                            bytetype=rdbfile.read(1)
+                        bytetype=data
+                        for i in range(k_count):                            
                             value_type= bytetype[0]
                             type = RedisAsyncServer.server.get_type(value_type)
                             # print("type = ",type)
@@ -142,7 +142,10 @@ def initialize_data_store():
                             RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
                             print('=======saved========') 
                             print(f'type({type}) --->{key} : {val}') 
-                                
+                            bytetype=rdbfile.read(1)
+                        data = bytetype 
+                    if data == b'\xff':
+                        break
                                         
     except Exception as e:
         print("Exception during rdb file save :: ",e)    
