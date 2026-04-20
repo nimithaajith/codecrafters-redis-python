@@ -63,6 +63,7 @@ def initialize_data_store():
             if chunk == b'REDIS' :
                 print("Reading rdb file, REDIS found !!")  
             key_count=0
+            expiring_key_count=0
             while i := rdbfile.read(1):
                 if i==b'\xfe':
                     print("New db found !!")  
@@ -70,6 +71,7 @@ def initialize_data_store():
                         if i==b'\xfb':
                             key_count=rdbfile.read(1)[0]
                             print("Key count= ",key_count)  
+                            expiring_key_count=rdbfile.read(1)[0]
                             break
                     break 
             if key_count:   
@@ -77,37 +79,49 @@ def initialize_data_store():
                     # create=False
                     if data == b'\xff':
                         break
-                    if data == b'\xfd':
-                        print(">>>>non Expire timestamp in seconds key-value found")
+                    if expiring_key_count:
+                        if data == b'\xfd':
+                            print(">>>>Expire timestamp in seconds key-value found")
+                            
+                            #Expire timestamp in seconds (4-byte unsigned integer)
+                            expires_on_sec = int.from_bytes(rdbfile.read(4), byteorder='little', signed=False)
+                            expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_on_sec)                
+                            value_type= rdbfile.read(1)[0]
+                            type = RedisAsyncServer.server.get_type(value_type)
+                            key_len=rdbfile.read(1)[0]
+                            key=rdbfile.read(key_len).decode()
+                            val_len=rdbfile.read(1)[0]
+                            val=rdbfile.read(val_len).decode()
+                            RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
+                            print('=======saved========') 
+                            print(f'type({type}) --->{key} : {val}') 
+                            expiring_key_count -=1
+                                    
+                                            
+                            
+                            
+                        elif data == b'\xfc' :
+                            print(">>>Expire timestamp in milliseconds key-value found")
+                            #Expire timestamp in milliseconds (8-byte unsigned long)
+                            expires_on_sec = int.from_bytes(rdbfile.read(8), byteorder='little', signed=False)
+                            expiry = datetime.now(timezone.utc) + timedelta(milliseconds=expires_on_sec)
+                            value_type= rdbfile.read(1)[0]
+                            type = RedisAsyncServer.server.get_type(value_type)
+                            key_len=rdbfile.read(1)[0]
+                            key=rdbfile.read(key_len).decode()
+                            val_len=rdbfile.read(1)[0]
+                            val=rdbfile.read(val_len).decode()
+                            RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
+                            print('=======saved========') 
+                            print(f'type({type}) --->{key} : {val}') 
+                            expiring_key_count -=1
                         
-                        #Expire timestamp in seconds (4-byte unsigned integer)
-                        expires_on_sec = int.from_bytes(rdbfile.read(4), byteorder='little', signed=False)
-                        expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_on_sec)                
-                        value_type= rdbfile.read(1)[0]
-                        type = RedisAsyncServer.server.get_type(value_type)
-                        key_len=rdbfile.read(1)[0]
-                        key=rdbfile.read(key_len).decode()
-                        val_len=rdbfile.read(1)[0]
-                        val=rdbfile.read(val_len).decode()
-                        create=True
-                        
-                    elif data == b'\xfc' :
-                        print(">>>>non Expire timestamp in milliseconds key-value found")
-                        #Expire timestamp in milliseconds (8-byte unsigned long)
-                        expires_on_sec = int.from_bytes(rdbfile.read(8), byteorder='little', signed=False)
-                        expiry = datetime.now(timezone.utc) + timedelta(milliseconds=expires_on_sec)
-                        value_type= rdbfile.read(1)[0]
-                        type = RedisAsyncServer.server.get_type(value_type)
-                        key_len=rdbfile.read(1)[0]
-                        key=rdbfile.read(key_len).decode()
-                        val_len=rdbfile.read(1)[0]
-                        val=rdbfile.read(val_len).decode()
-                        create=True
                     elif data == b'\x00' :
                         print(">>>>non expiriny key-value found")
+                        k_count= key_count-expiring_key_count
                         # data without expiry
                         expiry=None
-                        for i in range(key_count):
+                        for i in range(k_count):
                             bytetype=rdbfile.read(1)
                             value_type= bytetype[0]
                             type = RedisAsyncServer.server.get_type(value_type)
