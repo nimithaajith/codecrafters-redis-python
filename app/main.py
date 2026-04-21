@@ -967,6 +967,15 @@ async def client_handler(reader,writer):
                 continue 
             # print('RECEIVED = ',query_string)
             input_tokens=query_string.splitlines()
+            if channel_subscriptions[client_addr] :
+                if len(channel_subscriptions[client_addr])>0 :
+                    allowed_cmds=['SUBSCRIBE','UNSUBSCRIBE','PSUBSCRIBE','PUNSUBSCRIBE','PING','QUIT']            
+                    if input_tokens[2].upper() not in allowed_cmds:
+                        response=f"-ERR Can't execute '{input_tokens[2]}' in subscribed mode\r\n"
+                        writer.write(response.encode())
+                        await writer.drain() 
+                        continue                         
+
             if 'info' in input_tokens or 'INFO' in input_tokens:
                 if 'replication' in input_tokens:
                     role=RedisAsyncServer.role
