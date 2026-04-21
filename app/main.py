@@ -153,6 +153,7 @@ def initialize_data_store():
     
 
 RedisAsyncServer=RedisServer()
+channel_subscriptions={}
 
 CommandDeque=deque()
 class RedisObject():
@@ -533,7 +534,11 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             # print('###RESPONSE###')
             # print(response)
         elif data_list[0].lower() == 'subscribe':
-            response=f'*3\r\n$9\r\nsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:1\r\n'
+            if client_addr not in channel_subscriptions:
+                channel_subscriptions[client_addr] = set()
+            channel_subscriptions[client_addr].add(data_list[1])
+            channels=len(channel_subscriptions[client_addr])
+            response=f'*3\r\n$9\r\nsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'
         elif data_list[0] == 'KEYS': 
             if data_list[1] == '*':
                 all_keys=RedisAsyncServer.data_store.keys()
