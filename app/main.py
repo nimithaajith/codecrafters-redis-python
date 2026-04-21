@@ -974,8 +974,13 @@ async def client_handler(reader,writer):
                         response=f"-ERR Can't execute '{input_tokens[2]}' in subscribed mode\r\n"
                         writer.write(response.encode())
                         await writer.drain() 
-                        continue                         
-            print('Command alloed for client !!!!!',input_tokens[2])
+                        continue  
+                    elif input_tokens[2].upper()=='PING':
+                        response=b'*2\r\n$4\r\npong\r\n$0\r\n\r\n' 
+                        writer.write(response)
+                        await writer.drain() 
+                        continue                       
+            
             if 'info' in input_tokens or 'INFO' in input_tokens:
                 if 'replication' in input_tokens:
                     role=RedisAsyncServer.role
