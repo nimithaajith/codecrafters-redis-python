@@ -975,7 +975,7 @@ async def client_handler(reader,writer):
                         writer.write(response.encode())
                         await writer.drain() 
                         continue                         
-
+            print('Command alloed for client !!!!!',input_tokens[2])
             if 'info' in input_tokens or 'INFO' in input_tokens:
                 if 'replication' in input_tokens:
                     role=RedisAsyncServer.role
