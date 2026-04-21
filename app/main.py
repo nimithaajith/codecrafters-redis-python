@@ -539,6 +539,14 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             channel_subscriptions[client_addr].add(data_list[1])
             channels=len(channel_subscriptions[client_addr])
             response=f'*3\r\n$9\r\nsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'
+        elif data_list[0].lower() == 'publish':
+            subscribers=0
+            if channel_subscriptions:
+                for channels in channel_subscriptions.values():
+                    if data_list[1] in channels:
+                        subscribers += 1
+            response=f':{subscribers}\r\n'
+
         elif data_list[0] == 'KEYS': 
             if data_list[1] == '*':
                 all_keys=RedisAsyncServer.data_store.keys()
