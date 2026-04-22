@@ -535,15 +535,22 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             # print(response)
         elif data_list[0].lower() == 'subscribe':
             if client_addr not in channel_subscriptions:
-                channel_subscriptions[client_addr] = set()
-            channel_subscriptions[client_addr].add(data_list[1])
-            channels=len(channel_subscriptions[client_addr])
+                channel_subscriptions[client_addr]=[]
+                channel_subscriptions[client_addr][0] = set()
+                channel_subscriptions[client_addr][1] = writer
+                
+            channel_subscriptions[client_addr][0].add(data_list[1])
+            channels=len(channel_subscriptions[client_addr][0])
             response=f'*3\r\n$9\r\nsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'
         elif data_list[0].lower() == 'publish':
             subscribers=0
+            
             if channel_subscriptions:
-                for channels in channel_subscriptions.values():
+                for channels,subc_writer in channel_subscriptions.values():
                     if data_list[1] in channels:
+                        subc_resp=f'*3\r\n$7\r\nmessage\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n${len(data_list[2])}\r\n{data_list[2]}\r\n'
+                        subc_writer.write(subc_resp.encode())
+                        await subc_writer.drain() 
                         subscribers += 1
             response=f':{subscribers}\r\n'
 
