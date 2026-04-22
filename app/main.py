@@ -543,6 +543,14 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             channel_subscriptions[client_addr][0].add(data_list[1])
             channels=len(channel_subscriptions[client_addr][0])
             response=f'*3\r\n$9\r\nsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'
+        elif data_list[0].lower() == 'unsubscribe':
+            if client_addr in channel_subscriptions:
+                if data_list[1] in channel_subscriptions[client_addr][0]:
+                    channel_subscriptions[client_addr][0].remove(data_list[1])                
+            channels=len(channel_subscriptions[client_addr][0])
+            response=f'*3\r\n$12\r\nunsubscribed\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'
+        
+
         elif data_list[0].lower() == 'publish':
             subscribers=0
             
