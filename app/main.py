@@ -548,7 +548,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 if data_list[1] in channel_subscriptions[client_addr][0]:
                     channel_subscriptions[client_addr][0].remove(data_list[1])                
             channels=len(channel_subscriptions[client_addr][0])
-            response=f'*3\r\n$12\r\nunsubscribed\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'
+            response=f'*3\r\n$11\r\nunsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'
         
 
         elif data_list[0].lower() == 'publish':
