@@ -534,11 +534,12 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             # print('###RESPONSE###')
             # print(response)
         elif data_list[0].lower() == 'subscribe':
+            print('inside subscribe, datalist = ',data_list)
             if client_addr not in channel_subscriptions:
                 channel_subscriptions[client_addr]=[]
-                channel_subscriptions[client_addr][0] = set()
-                channel_subscriptions[client_addr][1] = writer
-                
+                channel_subscriptions[client_addr].append(set())
+                channel_subscriptions[client_addr].append(writer)
+            print('inside subscribe, channel name = ',data_list[1])    
             channel_subscriptions[client_addr][0].add(data_list[1])
             channels=len(channel_subscriptions[client_addr][0])
             response=f'*3\r\n$9\r\nsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'
