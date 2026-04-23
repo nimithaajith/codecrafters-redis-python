@@ -957,16 +957,35 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             key=data_list[1]
             score=float(data_list[2])
             member = data_list[3]
-            data_tuple=tuple((score,member))
-            print(data_tuple)
+            response=None
+            score_list=list((score,member))            
             if key not in RedisAsyncServer.data_store:
-                RedisAsyncServer.data_store[key] = RedisObject(data=[],data_type='sortedset')
-            RedisAsyncServer.data_store[key].data.append(data_tuple)
-            updated_data = RedisAsyncServer.data_store[key].data
+                new_redis_object = RedisObject(data=[],data_type='sortedset')
+                updated_data=[]
+                updated_data.append(score_list)                
+                RedisAsyncServer.data_store[key] = new_redis_object
+                
+            else:
+                memberExists = False
+                old_data = RedisAsyncServer.data_store[key].data
+                for l in old_data:
+                    if l[1] == member :
+                        updated_data = old_data 
+                        updated_data.remove(l)
+                        updated_data.append(score_list)                        
+                        response=':0\r\n' 
+                        memberExists = True                      
+                        break
+                if not memberExists:
+                    updated_data=RedisAsyncServer.data_store[key].data 
+                    updated_data.append(score_list)
+
+            
             new_sorted_data  = sorted(updated_data,key=lambda x : (x[0],x[1])) 
             print("new data = ",new_sorted_data)
             RedisAsyncServer.data_store[key].data =new_sorted_data  
-            response=':1\r\n'   
+            if response in None:
+                response=':1\r\n'   
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
             if key in RedisAsyncServer.data_store.keys() :
