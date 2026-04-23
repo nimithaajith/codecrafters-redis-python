@@ -961,7 +961,8 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             print(data_tuple)
             if key not in RedisAsyncServer.data_store:
                 RedisAsyncServer.data_store[key] = RedisObject(data=[],data_type='sortedset')
-            updated_data = RedisAsyncServer.data_store[key].data.append(data_tuple)
+            RedisAsyncServer.data_store[key].data.append(data_tuple)
+            updated_data = RedisAsyncServer.data_store[key].data
             new_sorted_data  = sorted(updated_data,key=lambda x : (x[0],x[1])) 
             print("new data = ",new_sorted_data)
             RedisAsyncServer.data_store[key].data =new_sorted_data  
