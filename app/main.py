@@ -984,7 +984,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             new_sorted_data  = sorted(updated_data,key=lambda x : (x[0],x[1])) 
             print("new data = ",new_sorted_data)
             RedisAsyncServer.data_store[key].data =new_sorted_data  
-            if response in None:
+            if response is None:
                 response=':1\r\n'   
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
