@@ -953,16 +953,18 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             # await writer.drain() 
         elif data_list[0].lower() == 'zadd':
             # ZADD racer_scores 8.0 "Sam"
+            print('data_list =', data_list)
             key=data_list[1]
             score=float(data_list[2])
             member = data_list[3]
             data_tuple=tuple((score,member))
+            print(data_tuple)
             if key not in RedisAsyncServer.data_store:
-                RedisAsyncServer.data_store[key] = []
-            old_data = RedisAsyncServer.data_store[key].append(data_tuple)
-            new_sorted_data  = sorted(old_data,key=lambda x : (x[0],x[1])) 
+                RedisAsyncServer.data_store[key] = RedisObject(data=[],type='sortedset')
+            updated_data = RedisAsyncServer.data_store[key].data.append(data_tuple)
+            new_sorted_data  = sorted(updated_data,key=lambda x : (x[0],x[1])) 
             print("new data = ",new_sorted_data)
-            RedisAsyncServer.data_store[key] =new_sorted_data  
+            RedisAsyncServer.data_store[key].data =new_sorted_data  
             response=b':1\r\n'   
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
