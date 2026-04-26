@@ -1067,11 +1067,12 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 for l in old_data:
                     if l[1] == member : 
                         scr_str=str(l[0])                                                                    
-                        response=f'-{scr_str}\r\n' 
+                        response=f'${len(scr_str)}\r\n{scr_str}\r\n' 
                         is_member = True                      
                         break
                 if not is_member:
                     response = '$-1\r\n'
+            print("zscore response = ",response)
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
             if key in RedisAsyncServer.data_store.keys() :
