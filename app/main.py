@@ -1019,10 +1019,13 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 total_len=len(scores)
                 # If the start index is greater than or equal to the cardinality of the sorted set, an empty array is returned.
                 #If the start index is greater than the stop index, the result is an empty array
-                if start_inx >= total_len or start_inx > end_inx :
+                if start_inx >= total_len :
                     response = '*0\r\n' 
                     slice = False
-                else :
+                if  end_inx >= 0 and start_inx > end_inx :
+                    response = '*0\r\n' 
+                    slice = False
+                if slice:
                     # If the stop index is greater than the cardinality of the sorted set, the stop index is treated as the last element.
                     if end_inx > total_len :
                         end_inx = total_len-1
@@ -1037,7 +1040,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                         else: 
                             start_inx = start_inx +total_len
                     
-                if slice:
+                    print("zrange slicing = ",start_inx,end_inx+1)
                     sliced_set= scores[start_inx : end_inx+1]
                     print("zrange sliced_set = ",sliced_set)
                     response=f'*{len(sliced_set)}\r\n'
