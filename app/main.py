@@ -1009,6 +1009,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             key=data_list[1]
             start_inx=int(data_list[2])
             end_inx=int(data_list[3])
+            print(f"zrange[{key}] : [{start_inx} : {end_inx}]")
             slice = True
             if key not in RedisAsyncServer.data_store :
                 response = '*0\r\n' 
