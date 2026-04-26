@@ -1037,6 +1037,8 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     
                 if slice:
                     if end_inx < 0:
+                        if start_index >= 0:
+                            end_inx = end_inx +(-1)
                         sliced_set= scores[start_inx : end_inx]
                     else:
                         sliced_set= scores[start_inx : end_inx+1]
