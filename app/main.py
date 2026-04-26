@@ -1065,8 +1065,9 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 is_member = False
                 old_data = RedisAsyncServer.data_store[key].data
                 for l in old_data:
-                    if l[1] == member :                                                                     
-                        response=f'-{l[0]}\r\n' 
+                    if l[1] == member : 
+                        scr_str=str(l[0])                                                                    
+                        response=f'-{scr_str}\r\n' 
                         is_member = True                      
                         break
                 if not is_member:
