@@ -1025,6 +1025,14 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     # If the stop index is greater than the cardinality of the sorted set, the stop index is treated as the last element.
                     if end_inx > total_len :
                         end_inx = total_len-1
+                    if end_inx < 0:
+                        if abs(end_inx) >= total_len :
+                            end_inx = 0
+                    if start_inx < 0:
+                        if abs(start_inx) >= total_len :
+                            start_inx = 0
+                        else: 
+                            start_inx = start_inx +(-1)
                     
                 if slice:
                     sliced_set= scores[start_inx : end_inx+1]
