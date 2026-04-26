@@ -1007,8 +1007,8 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
         elif data_list[0].lower() == 'zrange' :
             # ZRANGE racer_scores 0 2
             key=data_list[1]
-            start_inx=data_list[2]
-            end_inx=data_list[3]
+            start_inx=int(data_list[2])
+            end_inx=int(data_list[3])
             slice = True
             if key not in RedisAsyncServer.data_store :
                 response = '*0\r\n' 
