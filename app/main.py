@@ -1003,7 +1003,34 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                         memberExists = True                      
                         break
                 if not memberExists:
-                    response = '$-1\r\n' 
+                    response = '$-1\r\n'
+        elif data_list[0].lower() == 'zrange' :
+            # ZRANGE racer_scores 0 2
+            key=data_list[1]
+            start_inx=data_list[2]
+            end_inx=data_list[3]
+            slice = True
+            if key not in RedisAsyncServer.data_store :
+                response = '*0\r\n' 
+                slice = False
+            else:
+                scores=RedisAsyncServer.data_store[key].data
+                total_len=len(scores)
+                # If the start index is greater than or equal to the cardinality of the sorted set, an empty array is returned.
+                #If the start index is greater than the stop index, the result is an empty array
+                if start_inx >= total_len or start_inx > end_inx :
+                    response = '*0\r\n' 
+                    slice = False
+                else :
+                    # If the stop index is greater than the cardinality of the sorted set, the stop index is treated as the last element.
+                    if end_inx > total_len :
+                        end_inx = total_len-1
+                    
+                if slice:
+                    sliced_set= scores[start_inx : end_inx+1]
+                    response=f'*{len(sliced_set)}\r\n'
+                    response=response+''.join(f'${len(l[1])}\r\n{l[1]}\r\n' for l in sliced_set)
+            print("zrange response = ",response)
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
             if key in RedisAsyncServer.data_store.keys() :
