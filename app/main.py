@@ -1049,6 +1049,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
         elif data_list[0].lower() == 'zcard' :
             # ZCARD zset_key
             key = data_list[1]
+            
             if key not in RedisAsyncServer.data_store :
                 response = ":0\r\n" 
                 
@@ -1059,6 +1060,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
         elif data_list[0].lower() == 'zscore' :
             # ZSCORE zset_key member
             key = data_list[1]
+            member=data_list[2]
             if key not in RedisAsyncServer.data_store :
                 response = "$-1\r\n" 
             else:
