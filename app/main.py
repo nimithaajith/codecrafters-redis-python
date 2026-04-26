@@ -1046,6 +1046,16 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     response=f'*{len(sliced_set)}\r\n'
                     response=response+''.join(f'${len(l[1])}\r\n{l[1]}\r\n' for l in sliced_set)
             print("zrange response = ",response)
+        elif data_list[0].lower() == 'zcard' :
+            # ZCARD zset_key
+            key = data_list[1]
+            if key not in RedisAsyncServer.data_store :
+                response = ":0\r\n" 
+                
+            else:
+                scores=RedisAsyncServer.data_store[key].data
+                total_len=len(scores)
+                response = f":{total_len}\r\n" 
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
             if key in RedisAsyncServer.data_store.keys() :
