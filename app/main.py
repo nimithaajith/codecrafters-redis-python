@@ -1029,19 +1029,16 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     if end_inx < 0:
                         if abs(end_inx) >= total_len :
                             end_inx = 0
+                        else:
+                            end_inx = total_len + end_inx
                     if start_inx < 0:
                         if abs(start_inx) >= total_len :
                             start_inx = 0
                         else: 
-                            start_inx = start_inx +(-1)
+                            start_inx = start_inx +total_len
                     
                 if slice:
-                    if end_inx < 0:
-                        if start_index >= 0:
-                            end_inx = end_inx +(-1)
-                        sliced_set= scores[start_inx : end_inx]
-                    else:
-                        sliced_set= scores[start_inx : end_inx+1]
+                    sliced_set= scores[start_inx : end_inx+1]
                     print("zrange sliced_set = ",sliced_set)
                     response=f'*{len(sliced_set)}\r\n'
                     response=response+''.join(f'${len(l[1])}\r\n{l[1]}\r\n' for l in sliced_set)
