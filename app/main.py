@@ -1075,6 +1075,25 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 if not is_member:
                     response = '$-1\r\n'
             print("zscore response = ",response)
+        elif data_list[0].lower() == 'zrem' :
+            # ZREM zset_key member
+            key = data_list[1]
+            member=data_list[2]
+            if key not in RedisAsyncServer.data_store :
+                response = ":0\r\n" 
+            else:
+                is_member = False
+                old_data = RedisAsyncServer.data_store[key].data
+                for l in old_data:
+                    if l[1] == member : 
+                        old_data.remove(l) 
+                        RedisAsyncServer.data_store[key].data =old_data                                                                  
+                        response=':1\r\n' 
+                        is_member = True                      
+                        break
+                if not is_member:
+                    response = ':0\r\n'
+            
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
             if key in RedisAsyncServer.data_store.keys() :
