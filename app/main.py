@@ -1099,13 +1099,42 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             longitude=float(data_list[2])
             latitude=float(data_list[3]) 
             placename=data_list[4]
+            response=None
             if longitude < -180 or longitude > 180 or latitude < -85.05112878 or latitude > 85.05112878 :
                 response=f'-ERR invalid longitude,latitude pair {longitude},{latitude}\r\n'
             else:
-                if not key in RedisAsyncServer.data_store :
-                    RedisAsyncServer.data_store[key] = RedisObject(data=[],data_type='geospatial')
-                RedisAsyncServer.data_store[key].data.append((longitude,latitude,placename))  
-                response = ':1\r\n'  
+                # if not key in RedisAsyncServer.data_store :
+                #     RedisAsyncServer.data_store[key] = RedisObject(data=[],data_type='geospatial')
+                # RedisAsyncServer.data_store[key].data.append((longitude,latitude,placename))  
+                # response = ':1\r\n'  
+                
+                score_list=list((0,placename))            
+                if key not in RedisAsyncServer.data_store:
+                    new_redis_object = RedisObject(data=[],data_type='sortedset')
+                    updated_data=[]
+                    updated_data.append(score_list)                
+                    RedisAsyncServer.data_store[key] = new_redis_object
+                    
+                else:
+                    memberExists = False
+                    old_data = RedisAsyncServer.data_store[key].data
+                    for l in old_data:
+                        if l[1] == placename :
+                            updated_data = old_data 
+                            updated_data.remove(l)
+                            updated_data.append(score_list)                        
+                            response=':0\r\n' 
+                            memberExists = True                      
+                            break
+                    if not memberExists:
+                        updated_data=RedisAsyncServer.data_store[key].data 
+                        updated_data.append(score_list)
+                
+                new_sorted_data  = sorted(updated_data,key=lambda x : (x[0],x[1])) 
+                print("new data = ",new_sorted_data)
+                RedisAsyncServer.data_store[key].data =new_sorted_data  
+                if response is None:
+                    response=':1\r\n' 
 
 
         elif data_list[0] == 'TYPE': 
