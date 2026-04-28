@@ -1099,10 +1099,14 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             longitude=float(data_list[2])
             latitude=float(data_list[3]) 
             placename=data_list[4]
-            if not key in RedisAsyncServer.data_store :
-                RedisAsyncServer.data_store[key] = RedisObject(data=[],data_type='geospatial')
-            RedisAsyncServer.data_store[key].data.append((longitude,latitude,placename))  
-            response = ':1\r\n'  
+            if longitude < -180 or longitude > 180 or latitude < -85.05112878 or latitude > 85.05112878 :
+                response=f'-ERR invalid longitude,latitude pair {longitude},{latitude}\r\n'
+            else:
+                if not key in RedisAsyncServer.data_store :
+                    RedisAsyncServer.data_store[key] = RedisObject(data=[],data_type='geospatial')
+                RedisAsyncServer.data_store[key].data.append((longitude,latitude,placename))  
+                response = ':1\r\n'  
+
 
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
