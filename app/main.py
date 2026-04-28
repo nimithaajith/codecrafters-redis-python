@@ -6,6 +6,7 @@ from collections import deque,defaultdict
 import os
 import json
 import shutil
+from . import geo_encode
 class RedisServer():
     def __init__(self,role='master',port=6379):
         self.port= port
@@ -1107,8 +1108,8 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 #     RedisAsyncServer.data_store[key] = RedisObject(data=[],data_type='geospatial')
                 # RedisAsyncServer.data_store[key].data.append((longitude,latitude,placename))  
                 # response = ':1\r\n'  
-                
-                score_list=list((0,placename))            
+                geoscore= geo_encode.encode(latitude=latitude,longitude=longitude)
+                score_list=list((geoscore,placename))            
                 if key not in RedisAsyncServer.data_store:
                     new_redis_object = RedisObject(data=[],data_type='sortedset')
                     updated_data=[]
