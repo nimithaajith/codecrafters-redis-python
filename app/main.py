@@ -1093,7 +1093,17 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                         break
                 if not is_member:
                     response = ':0\r\n'
-            
+        elif data_list[0].upper() == 'GEOADD':
+        #GEOADD key longitude latitude placename  
+            key=data_list[1]
+            longitude=float(data_list[2])
+            latitude=float(data_list[3]) 
+            placename=data_list[4]
+            if not key in RedisAsyncServer.data_store :
+                RedisAsyncServer.data_store[key] = RedisObject(data=[],data_type='geospatial')
+            RedisAsyncServer.data_store[key].data.append((longitude,latitude,placename))  
+            response = ':1\r\n'  
+
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
             if key in RedisAsyncServer.data_store.keys() :
