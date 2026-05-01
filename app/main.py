@@ -1152,7 +1152,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                             latitude,longitude=geo_decode.decode(int(score))
                             la=str(latitude)
                             lo=str(longitude)
-                            response=response + f'*2\r\n${len(la)}\r\n{la}\r\n${len(lo)}\r\n{lo}\r\n'
+                            response=response + f'*2\r\n${len(lo)}\r\n{lo}\r\n${len(la)}\r\n{la}\r\n'
                             is_member=True
                             break
                     if not is_member:
