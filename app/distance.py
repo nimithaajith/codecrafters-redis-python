@@ -2,7 +2,7 @@ from math import radians, sin, cos, sqrt, asin
 
 
 def haversine(lat1, lon1, lat2, lon2):
-    R = 6372.8  # Earth radius in kilometers
+    R = 6372797.560856/1000 # Earth radius in kmeters
 
     dLat = radians(lat2 - lat1)
     dLon = radians(lon2 - lon1)
