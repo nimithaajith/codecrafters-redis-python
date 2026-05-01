@@ -1149,7 +1149,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     is_member=False
                     for score,member in geopos:
                         if member == query_member:
-                            latitude,longitude=geo_decode.decode(score)
+                            latitude,longitude=geo_decode.decode(int(score))
                             la=str(latitude)
                             lo=str(longitude)
                             response=response + f'*2\r\n${len(la)}\r\n{la}\r\n${len(lo)}\r\n{lo}\r\n'
