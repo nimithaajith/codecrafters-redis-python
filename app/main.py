@@ -7,7 +7,7 @@ import os
 import json
 import shutil
 from . import geo_encode
-import distance
+from . import distance
 class RedisServer():
     def __init__(self,role='master',port=6379):
         self.port= port
@@ -1176,9 +1176,10 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                         else:
                             latitude2,longitude2=geo_decode.decode(int(score))
                     if  latitude1 and longitude1 and latitude2 and longitude2 :
+                        print(latitude1, longitude1,' :::: ',latitude2,longitude2)
                         break
-                distance=  distance.haversine(latitude1, longitude1, latitude2, longitude2)  
-                response=f'${len(str(distance))}\r\n{str(distance)}\r\n'
+                dist=  distance.haversine(latitude1, longitude1, latitude2, longitude2)  
+                response=f'${len(str(dist))}\r\n{str(dist)}\r\n'
             else:
                 response = '$-1\r\n'
         elif data_list[0] == 'TYPE': 
