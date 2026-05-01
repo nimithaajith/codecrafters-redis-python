@@ -1143,10 +1143,8 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             members=data_list[2:]
             m_len=len(members)
             response=f'*{m_len}\r\n'
-            if key in RedisAsyncServer.data_store :
-                
-                geopos=RedisAsyncServer.data_store[key].data
-                
+            if key in RedisAsyncServer.data_store :                
+                geopos=RedisAsyncServer.data_store[key].data                
                 for query_member in members:
                     is_member=False
                     for score,member in geopos:
