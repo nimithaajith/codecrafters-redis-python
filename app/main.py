@@ -1168,7 +1168,10 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             locations=data_list[2:]            
             if key in RedisAsyncServer.data_store :                
                 geopos=RedisAsyncServer.data_store[key].data 
-                latitude1 = None,longitude1= None,latitude2= None,longitude2 = None
+                latitude1 = None
+                longitude1= None
+                latitude2= None
+                longitude2 = None
                 for score,location in geopos:
                     if location in locations:
                         if location == locations[0]:
