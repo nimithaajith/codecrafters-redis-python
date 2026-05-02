@@ -1186,12 +1186,39 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                         print(latitude1, longitude1,' :::: ',latitude2,longitude2)
                         dist=  distance.haversine(latitude1, longitude1, latitude2, longitude2)  
                         response=f'${len(str(dist))}\r\n{str(dist)}\r\n'
-                        break
-
-                
+                        break               
                 
             else:
                 response = '$-1\r\n'
+        elif data_list[0].upper() == 'GEOSEARCH' :
+            # GEOSEARCH key FROMLONLAT longitude latitude BYRADIUS radius unit(m)            
+            key=data_list[1]
+            locations=[]
+            if key in RedisAsyncServer.data_store :                
+                geopos=RedisAsyncServer.data_store[key].data 
+                center_lat = data_list[3]
+                center_long= data_list[4]
+                radius=float(data_list[6])
+                unit=data_list[7]
+                conv=1
+                if unit == 'km':
+                    conv=0.001
+                elif unit == 'mi' :
+                    conv =0.00062137
+
+                for score,place in geopos:
+                    lat,long=geo_decode.decode(int(score))
+                    dist=  distance.haversine(center_lat, center_long, lat, long)
+                    if (dist * conv) <= radius :
+                        locations.append(place)
+                if locations :
+                    response=f'*{len(locations)}\r\n'+''.join(f'${len(l)}\r\n{l}\r\n' for l in locations)
+                else:
+                    response=f'$1\r\n0\r\n'
+
+            else:
+                response = '$-1\r\n'
+
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
             if key in RedisAsyncServer.data_store.keys() :
