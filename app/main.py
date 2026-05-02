@@ -1196,8 +1196,8 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             locations=[]
             if key in RedisAsyncServer.data_store :                
                 geopos=RedisAsyncServer.data_store[key].data 
-                center_lat = float(data_list[3])
-                center_long= float(data_list[4])
+                center_long = float(data_list[3])
+                center_lat= float(data_list[4])
                 radius=float(data_list[6])
                 print("Radius = ",radius)
                 unit=data_list[7]
@@ -1209,7 +1209,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
 
                 for score,place in geopos:
                     lat,long=geo_decode.decode(int(score))
-                    dist=  distance.haversine(center_lat, center_long, lat, long)
+                    dist=  distance.haversine( lat, long,center_lat, center_long)
                     print(f">>>>>>distance for place {place} = {dist}")
                     if (dist * conv) <= radius :
                         locations.append(place)
