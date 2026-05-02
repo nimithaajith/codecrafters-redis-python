@@ -1216,10 +1216,10 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 if locations :
                     response=f'*{len(locations)}\r\n'+''.join(f'${len(l)}\r\n{l}\r\n' for l in locations)
                 else:
-                    response=f'*1\r\n$1\r\n0\r\n'
+                    response=f'*0\r\n'
 
             else:
-                response=f'*1\r\n$1\r\n0\r\n'
+                response=f'*0\r\n'
             print("response = ",response)
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
