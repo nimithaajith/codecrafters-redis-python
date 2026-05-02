@@ -1196,8 +1196,8 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             locations=[]
             if key in RedisAsyncServer.data_store :                
                 geopos=RedisAsyncServer.data_store[key].data 
-                center_lat = data_list[3]
-                center_long= data_list[4]
+                center_lat = float(data_list[3])
+                center_long= float(data_list[4])
                 radius=float(data_list[6])
                 unit=data_list[7]
                 conv=1
