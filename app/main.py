@@ -28,6 +28,11 @@ class Master():
     def __init__(self):
         self.rdb_filename=None
         self.rdb_dir=None
+        self.dir='/app'
+        self.appendonly='no'
+        self.appenddirname='appendonlydir'
+        self.appendfilename='appendonly.aof'
+        self.appendfsync='everysec'
         self.master_replid = ''
         self.master_repl_offset=None
         
@@ -589,19 +594,23 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     if rdb_dir is not None:
                         response=f'*2\r\n$3\r\ndir\r\n${len(rdb_dir)}\r\n{rdb_dir}\r\n'
                     else:
-                        path='/app'
+                        path=RedisAsyncServer.server.dir
                         response=f'*2\r\n$3\r\ndir\r\n${len(path)}\r\n{path}\r\n'
                 elif data_list[2].lower() == 'dbfilename':
                     rdb_filename=RedisAsyncServer.server.rdb_filename
                     response=f'*2\r\n$10\r\ndbfilename\r\n${len(rdb_filename)}\r\n{rdb_filename}\r\n'
                 elif data_list[2].lower() == 'appendonly':
-                    response='*2\r\n$10\r\nappendonly\r\n$2\r\nno\r\n'
+                    aof_status=RedisAsyncServer.server.appendonly
+                    response=f'*2\r\n$10\r\nappendonly\r\n${len(aof_status)}\r\n{aof_status}\r\n'
                 elif data_list[2].lower() == 'appenddirname':
-                    response='*2\r\n$13\r\nappenddirname\r\n$13\r\nappendonlydir\r\n'
+                    appenddir=RedisAsyncServer.server.appenddirname
+                    response=f'*2\r\n$13\r\nappenddirname\r\n${len(appenddir)}\r\n{appenddir}\r\n'
                 elif data_list[2].lower() == 'appendfilename':
-                    response='*2\r\n$14\r\nappendfilename\r\n$14\r\nappendonly.aof\r\n'
+                    appendfile=RedisAsyncServer.server.appendfilename
+                    response=f'*2\r\n$14\r\nappendfilename\r\n${len(appendfile)}\r\n{appendfile}\r\n'
                 elif data_list[2].lower() == 'appendfsync':
-                    response='*2\r\n$11\r\nappendfsync\r\n$8\r\neverysec\r\n'
+                    append_sync=RedisAsyncServer.server.appendfsync
+                    response=f'*2\r\n$11\r\nappendfsync\r\n${len(append_sync)}\r\n{append_sync}\r\n'
         elif data_list[0] == 'SET':
             print("Inside SET , query_string",query_string)
             key=data_list[1]
@@ -1603,9 +1612,9 @@ import sys
 def main():
     master_details=''
     port_number=6379
+    args=sys.argv
     if '--port' in sys.argv:
-        try:
-            args=sys.argv
+        try:            
             port_number=int(args[args.index('--port')+1])
         except:
             port_number=6379
@@ -1614,8 +1623,7 @@ def main():
     if '--replicaof' in sys.argv:
         try:
             RedisAsyncServer.role='slave'
-            RedisAsyncServer.server=Replica()
-            args=sys.argv
+            RedisAsyncServer.server=Replica()            
             master_details=args[args.index('--replicaof')+1].split(' ')
             master_host = master_details[0].strip()
             master_port = int(master_details[1].strip())
@@ -1625,14 +1633,28 @@ def main():
         except:
             pass
     #--dir /tmp/redis-files --dbfilename dump.rdb
-    if '--dir' in sys.argv:
-        args=sys.argv
+    if '--dir' in sys.argv:        
         RDB_DIR=args[args.index('--dir')+1]
         RedisAsyncServer.server.rdb_dir=RDB_DIR
-    if '--dir' in sys.argv:
-        args=sys.argv
+        RedisAsyncServer.server.dir=RDB_DIR
+        
+    if '--dbfilename' in sys.argv:        
         RDB_FILENAME=args[args.index('--dbfilename')+1]
         RedisAsyncServer.server.rdb_filename=RDB_FILENAME
+        
+    if '--appendonly' in sys.argv:        
+        aof_val=args[args.index('--appendonly')+1]
+        RedisAsyncServer.server.appendonly=aof_val
+    if '--appenddirname' in sys.argv:        
+        appenddirname=args[args.index('--appenddirname')+1]
+        RedisAsyncServer.server.appenddirname=appenddirname
+    if '--appendfilename' in sys.argv:        
+        AOFFILENAME=args[args.index('--appendfilename')+1]
+        RedisAsyncServer.server.appendfilename=AOFFILENAME
+    if '--appendfsync' in sys.argv:        
+        aofsyncstat=args[args.index('--appendfsync')+1]
+        RedisAsyncServer.server.appendfsync=aofsyncstat
+
     if RedisAsyncServer.role=='master':
         RedisAsyncServer.server.master_replid = '8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb'
         RedisAsyncServer.server.master_repl_offset = 0
