@@ -586,11 +586,22 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             if data_list[1] == 'GET':
                 if data_list[2].lower() == 'dir':
                     rdb_dir=RedisAsyncServer.server.rdb_dir
-                    response=f'*2\r\n$3\r\ndir\r\n${len(rdb_dir)}\r\n{rdb_dir}\r\n'
+                    if rdb_dir is not None:
+                        response=f'*2\r\n$3\r\ndir\r\n${len(rdb_dir)}\r\n{rdb_dir}\r\n'
+                    else:
+                        path='C:\Users\Ardra\codecrafters-redis-python'
+                        response=f'*2\r\n$3\r\ndir\r\n${len(path)}\r\n{path}\r\n'
                 elif data_list[2].lower() == 'dbfilename':
                     rdb_filename=RedisAsyncServer.server.rdb_filename
                     response=f'*2\r\n$10\r\ndbfilename\r\n${len(rdb_filename)}\r\n{rdb_filename}\r\n'
-
+                elif data_list[2].lower() == 'appendonly':
+                    response='*2\r\n$10\r\nappendonly\r\n$2\r\nno\r\n'
+                elif data_list[2].lower() == 'appenddirname':
+                    response='*2\r\n$13\r\nappenddirname\r\n$13\r\nappendonlydir\r\n'
+                elif data_list[2].lower() == 'appendfilename':
+                    response='*2\r\n$14\r\nappendfilename\r\n$14\r\nappendonly.aof\r\n'
+                elif data_list[2].lower() == 'appendfsync':
+                    response='*2\r\n$11\r\nappendfsync\r\n$8\r\neverysec\r\n'
         elif data_list[0] == 'SET':
             print("Inside SET , query_string",query_string)
             key=data_list[1]
