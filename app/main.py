@@ -1657,8 +1657,10 @@ def main():
 
     if RedisAsyncServer.role=='master':
         if RedisAsyncServer.server.appendonly == 'yes' :
-            os.makedirs(RedisAsyncServer.server.appenddirname, exist_ok=True)
-            aof_filepath=os.path.join(RedisAsyncServer.server.appenddirname,RedisAsyncServer.server.appendfilename)
+            aof_dir=os.path.join(RedisAsyncServer.server.dir,RedisAsyncServer.server.appenddirname)
+            os.makedirs(aof_dir, exist_ok=True)
+            aof_filepath=os.path.join(aof_dir,RedisAsyncServer.server.appendfilename)
+            print('aof_dir =', aof_dir)
             print('aof_filepath =', aof_filepath)
         RedisAsyncServer.server.master_replid = '8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb'
         RedisAsyncServer.server.master_repl_offset = 0
