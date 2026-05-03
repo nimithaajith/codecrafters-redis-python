@@ -589,7 +589,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     if rdb_dir is not None:
                         response=f'*2\r\n$3\r\ndir\r\n${len(rdb_dir)}\r\n{rdb_dir}\r\n'
                     else:
-                        path='C:/Users/Ardra/codecrafters-redis-python'
+                        path='/app'
                         response=f'*2\r\n$3\r\ndir\r\n${len(path)}\r\n{path}\r\n'
                 elif data_list[2].lower() == 'dbfilename':
                     rdb_filename=RedisAsyncServer.server.rdb_filename
