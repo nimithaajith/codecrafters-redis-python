@@ -1637,7 +1637,7 @@ def main():
         RDB_DIR=args[args.index('--dir')+1]
         RedisAsyncServer.server.rdb_dir=RDB_DIR
         RedisAsyncServer.server.dir=RDB_DIR
-        
+
     if '--dbfilename' in sys.argv:        
         RDB_FILENAME=args[args.index('--dbfilename')+1]
         RedisAsyncServer.server.rdb_filename=RDB_FILENAME
@@ -1656,6 +1656,10 @@ def main():
         RedisAsyncServer.server.appendfsync=aofsyncstat
 
     if RedisAsyncServer.role=='master':
+        if RedisAsyncServer.server.appendonly == 'yes' :
+            os.makedirs(RedisAsyncServer.server.appenddirname, exist_ok=True)
+            aof_filepath=os.path.join(RedisAsyncServer.server.appenddirname,RedisAsyncServer.server.appendfilename)
+            print('aof_filepath =', aof_filepath)
         RedisAsyncServer.server.master_replid = '8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb'
         RedisAsyncServer.server.master_repl_offset = 0
         if RedisAsyncServer.server.rdb_dir and RedisAsyncServer.server.rdb_filename:
