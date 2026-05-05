@@ -1713,10 +1713,11 @@ def main():
             new_aof_file=RedisAsyncServer.server.appendfilename+'.1.incr.aof' 
             manifest_file=RedisAsyncServer.server.appendfilename+'.manifest'
             aof_filepath=os.path.join(aof_dir,new_aof_file)
-            with open(aof_filepath,'w') as f:
-                print(f'AOF file created by master......')
+            with open(aof_filepath,'a') as f:
+                print(f'AOF file check by master......')
             manifest_file_path=os.path.join(aof_dir,manifest_file)
-            with open(manifest_file_path,'w') as mf:
+            with open(manifest_file_path,'a') as mf:
+                print(f'manifest file check by master')
                 pass
                 # data_str=f'file {new_aof_file} seq 1 type i'
                 # print("Manifest file created and data written = ",mf.write(data_str))
@@ -1727,14 +1728,19 @@ def main():
             initialize_data_store()
     if RedisAsyncServer.role == 'master':
         if RedisAsyncServer.server.appendonly == 'yes':
+            print(">>>>>>>>AOF FILE REPLAY<<<<<<<<")
             aof_path=os.path.join(RedisAsyncServer.server.dir,RedisAsyncServer.server.appenddirname)
             if os.path.exists(aof_path) :
                 manifest_file=os.path.join(aof_path,RedisAsyncServer.server.appendfilename,'manifest')
                 if os.path.exists(manifest_file):
+                    print("Opening manifest file")
                     with open(manifest_file,'r') as mf:
                         contents=mf.read()  
+                        print("Contents of manifest file ::",contents)
                         for line in contents:
+                            print("line in aof file =",line)
                             if 'type i' in line:
+                                print("Calling aof reply......")
                                 aof_replay_file(aof_path,line) 
                                 break
     print("Execution starts here....!role=",RedisAsyncServer.role, master_details)
