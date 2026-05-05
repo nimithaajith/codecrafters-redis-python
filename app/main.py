@@ -1614,7 +1614,7 @@ def aof_replay_file(aof_path,line) :
     aof_file_name=line.split()[1]    
     aof_file=os.path.join(aof_path,aof_file_name)
     with open(aof_file,'r') as af:
-        m_commands=af.read()
+        m_commands=af.readlines()
     if m_commands is not None:    
         for m_command in m_commands:
             print(">>>AOF command = ",m_command)
@@ -1737,7 +1737,7 @@ def main():
                 if os.path.exists(manifest_file):
                     print("Opening manifest file")
                     with open(manifest_file,'r') as mf:
-                        contents=mf.read()  
+                        contents=mf.readlines()  
                         print("Contents of manifest file ::",contents)
                         for line in contents:
                             print("line in aof file =",line)
