@@ -1619,29 +1619,45 @@ def aof_replay_file(aof_path,line) :
         # for m_command in m_commands:
         print(">>>AOF command = ",m_commands)
         input_tokens=m_commands.splitlines()
-        no_of_elements=int(input_tokens[0].lstrip('*'))               
-        data_list=[]
-        if no_of_elements > 1:
-            for token in input_tokens:
-                if len(token)>1 and token.startswith('*'):                
-                    continue
-                if token.startswith('$') and token.strip() != '$':
-                    continue
-                data_list.append(token.strip())
-        if data_list:
-            if data_list[0].upper() == 'SET':
-                key=data_list[1]
-                val=data_list[2]
-                data_type = 'string'
-                expiry =None
-                if len(data_list) > 3:
-                    if data_list[3] == 'PX':
-                        expiry = datetime.now(timezone.utc) + timedelta(milliseconds=int(data_list[4]))
-                    elif data_list[3] == 'EX' :
-                        expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))                        
-                RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type)
-    else:
-        print("NO Commands to replay in AOF")
+        i=0
+        loop=True
+        commands=deque()
+        while i<len(input_tokens):
+            tokens=[]
+            if input_tokens[i].startswith('*') and len(input_tokens[i]) >1:
+                no_of_elements=int(input_tokens[i].lstrip('*')) 
+                count=no_of_elements*2
+                tokens.append(input_tokens[i])
+                for _ in range(count):
+                    i=i+1
+                    tokens.append(input_tokens[i])
+                print(">>>AOF command found = ",tokens)
+                commands.append(tokens)                
+            i=i+1
+
+        if commands:
+            for tokens in commands:           
+                data_list=[]            
+                for token in tokens:
+                    if len(token)>1 and token.startswith('*'):                
+                        continue
+                    if token.startswith('$') and token.strip() != '$':
+                        continue
+                    data_list.append(token.strip())
+                if data_list:
+                    if data_list[0].upper() == 'SET':
+                        key=data_list[1]
+                        val=data_list[2]
+                        data_type = 'string'
+                        expiry =None
+                        if len(data_list) > 3:
+                            if data_list[3] == 'PX':
+                                expiry = datetime.now(timezone.utc) + timedelta(milliseconds=int(data_list[4]))
+                            elif data_list[3] == 'EX' :
+                                expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))                        
+                        RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type)
+        else:
+            print("NO Commands to replay in AOF")
 
 
                                         
