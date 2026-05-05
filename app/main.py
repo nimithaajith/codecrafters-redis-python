@@ -1615,7 +1615,7 @@ def aof_replay_file(aof_path,line) :
     aof_file=os.path.join(aof_path,aof_file_name)
     with open(aof_file,'r') as af:
         m_commands=af.read()
-    if m_commands is not None:    
+    if m_commands :    
         # for m_command in m_commands:
         print(">>>AOF command = ",m_commands)
         input_tokens=m_commands.splitlines()
@@ -1640,7 +1640,8 @@ def aof_replay_file(aof_path,line) :
                     elif data_list[3] == 'EX' :
                         expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))                        
                 RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type)
-
+    else:
+        print("NO Commands to replay in AOF")
 
 
                                         
