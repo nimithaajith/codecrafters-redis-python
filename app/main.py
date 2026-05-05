@@ -1302,6 +1302,17 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                             RedisAsyncServer.users.append(user) 
                             break   
                 response='+OK\r\n'
+        elif data_list[0].upper() == 'AUTH':
+            #AUTH <username> <password>
+            user_name=data_list[1]
+            user_pass=data_list[2]
+            response='-Error WRONGPASS invalid username-password pair or user is disabled.\r\n'
+            for user in RedisAsyncServer.users:
+                if user.username == user_name:
+                    if user.password == hashing.hash_password(str(user_pass)):
+                        response='+OK\r\n'
+                        break                    
+
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
             if key in RedisAsyncServer.data_store.keys() :
