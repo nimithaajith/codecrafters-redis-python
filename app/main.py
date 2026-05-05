@@ -1264,7 +1264,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 response = '$7\r\ndefault\r\n'
             elif data_list[1].upper() == 'GETUSER':
                 user_name=data_list[2]
-                response = '*2\r\n$5\r\nflags\r\n$2\r\n*0\r\n'
+                response = '*2\r\n$5\r\nflags\r\n*0\r\n'
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
             if key in RedisAsyncServer.data_store.keys() :
