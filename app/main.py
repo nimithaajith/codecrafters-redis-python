@@ -8,6 +8,13 @@ import json
 import shutil
 from . import geo_encode
 from . import distance
+from . import hashing
+class User():
+    def __init__(self):
+        self.username='default'
+        self.flags=['nopass']
+        self.password=''
+user=User()
 class RedisServer():
     def __init__(self,role='master',port=6379):
         self.port= port
@@ -17,6 +24,7 @@ class RedisServer():
         self.master_port=None
         self.data_store={}
         self.server=Master()
+        self.users=[user]
 
 class Replica():
     def __init__(self):
@@ -47,6 +55,13 @@ class Master():
         if value == 2:
             return 'set'
         return 'string'
+    
+class User():
+    def __init__(self):
+        self.username='default'
+        self.flags=['nopass']
+        self.password=''
+user = User()
 def initialize_data_store():
     try:
         rdb_dir=RedisAsyncServer.server.rdb_dir
@@ -1264,7 +1279,29 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 response = '$7\r\ndefault\r\n'
             elif data_list[1].upper() == 'GETUSER':
                 user_name=data_list[2]
-                response = '*4\r\n$5\r\nflags\r\n*1\r\n$6\r\nnopass\r\n$9\r\npasswords\r\n*0\r\n'
+                user=RedisAsyncServer.users[0]
+                flags=user.flags
+                if 'nopass' in flags:
+                    response = '*4\r\n$5\r\nflags\r\n*1\r\n$6\r\nnopass\r\n$9\r\npasswords\r\n*0\r\n'
+                else:
+                    password=user.password
+                    response = f'*4\r\n$5\r\nflags\r\n*0\r\n$9\r\npasswords\r\n*1\r\n{len(password)}\r\n{password}\r\n'
+            elif data_list[1].upper() == 'SETUSER':
+                # ACL SETUSER default >mypassword
+                user_name=data_list[2]
+                if data_list[3].startswith('>'):
+                    raw_password=str(data_list[3]).lstrip('>')
+                    current_users=RedisAsyncServer.users
+                    for user in current_users:
+                        if user.username == user_name:
+                            RedisAsyncServer.users.remove(user)
+                            user.password = hashing.hash_password(raw_password)
+                            flags=user.flags
+                            if 'nopass' in flags:
+                                user.flags.remove('nopass') 
+                            RedisAsyncServer.users.append(user) 
+                            break   
+                response='+OK\r\n'
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
             if key in RedisAsyncServer.data_store.keys() :
