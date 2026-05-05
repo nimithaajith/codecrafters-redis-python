@@ -1717,15 +1717,16 @@ def main():
                 print(f'AOF file created by master......')
             manifest_file_path=os.path.join(aof_dir,manifest_file)
             with open(manifest_file_path,'w') as mf:
-                data_str=f'file {new_aof_file} seq 1 type i'
-                print("Manifest file created and data written = ",mf.write(data_str))
+                pass
+                # data_str=f'file {new_aof_file} seq 1 type i'
+                # print("Manifest file created and data written = ",mf.write(data_str))
             
         RedisAsyncServer.server.master_replid = '8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb'
         RedisAsyncServer.server.master_repl_offset = 0
         if RedisAsyncServer.server.rdb_dir and RedisAsyncServer.server.rdb_filename:
             initialize_data_store()
     if RedisAsyncServer.role == 'master':
-        if RedisAsyncServer.server.appendonly == 'ýes':
+        if RedisAsyncServer.server.appendonly == 'yes':
             aof_path=os.path.join(RedisAsyncServer.server.dir,RedisAsyncServer.server.appenddirname)
             if os.path.exists(aof_path) :
                 manifest_file=os.path.join(aof_path,RedisAsyncServer.server.appendfilename,'manifest')
