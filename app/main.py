@@ -1732,7 +1732,7 @@ def main():
             aof_path=os.path.join(RedisAsyncServer.server.dir,RedisAsyncServer.server.appenddirname)
             print('aof_path =',aof_path)
             if os.path.exists(aof_path) :
-                manifest_file=os.path.join(aof_path,RedisAsyncServer.server.appendfilename,'manifest')
+                manifest_file=os.path.join(aof_path,RedisAsyncServer.server.appendfilename+'.manifest')
                 print("manifest_file = ",manifest_file)
                 if os.path.exists(manifest_file):
                     print("Opening manifest file")
