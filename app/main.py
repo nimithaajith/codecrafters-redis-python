@@ -625,6 +625,23 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 
             RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
             print(f'{server_role} set the new value !!!!')
+            if server_role == 'master' :
+                if RedisAsyncServer.server.appendfsync == 'always':
+                    aof_dir=os.path.join(RedisAsyncServer.server.dir,RedisAsyncServer.server.appenddirname)                    
+                    manifest_file=RedisAsyncServer.server.appendfilename+'.manifest'        
+                    manifest_file_path=os.path.join(aof_dir,manifest_file)
+                    data_str=None
+                    with open(manifest_file_path,'r') as mf:
+                        data_str= mf.readline()
+                        print("manifest file read =",data_str)
+                    if data_str is not None:
+                        aof_file_name=data_str.split()[1]
+                        aof_file_path=os.path.join(aof_dir,aof_file_name)
+                        with open(aof_file_path,'a') as af:
+                            data_cmd=f'{query_string}'
+                            af.write(data_cmd)    
+                            print("Added SET to aoffile = ",data_cmd)        
+                    
             response=f"+OK\r\n" 
             
             # writer.write(response.encode())
