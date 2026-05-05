@@ -1650,8 +1650,7 @@ def main():
         RedisAsyncServer.server.appenddirname=appenddirname
     if '--appendfilename' in sys.argv:        
         AOFFILENAME=args[args.index('--appendfilename')+1]
-        new_aof_file=AOFFILENAME+'.1.incr.aof' #+AOFFILENAME.split('.')[1]
-        RedisAsyncServer.server.appendfilename=new_aof_file
+        RedisAsyncServer.server.appendfilename=AOFFILENAME
     if '--appendfsync' in sys.argv:        
         aofsyncstat=args[args.index('--appendfsync')+1]
         RedisAsyncServer.server.appendfsync=aofsyncstat
@@ -1660,7 +1659,8 @@ def main():
         if RedisAsyncServer.server.appendonly == 'yes' :
             aof_dir=os.path.join(RedisAsyncServer.server.dir,RedisAsyncServer.server.appenddirname)
             os.makedirs(aof_dir, exist_ok=True)
-            aof_filepath=os.path.join(aof_dir,RedisAsyncServer.server.appendfilename)
+            new_aof_file=RedisAsyncServer.server.appendfilename+'.1.incr.aof' 
+            aof_filepath=os.path.join(aof_dir,new_aof_file)
             with open(aof_filepath,'w') as f:
                 print(f'AOF file created by master......')
             
