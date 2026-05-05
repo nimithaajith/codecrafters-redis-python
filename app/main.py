@@ -1614,32 +1614,32 @@ def aof_replay_file(aof_path,line) :
     aof_file_name=line.split()[1]    
     aof_file=os.path.join(aof_path,aof_file_name)
     with open(aof_file,'r') as af:
-        m_commands=af.readlines()
+        m_commands=af.read()
     if m_commands is not None:    
-        for m_command in m_commands:
-            print(">>>AOF command = ",m_command)
-            input_tokens=m_command.splitlines()
-            no_of_elements=int(input_tokens[0].lstrip('*'))               
-            data_list=[]
-            if no_of_elements > 1:
-                for token in input_tokens:
-                    if len(token)>1 and token.startswith('*'):                
-                        continue
-                    if token.startswith('$') and token.strip() != '$':
-                        continue
-                    data_list.append(token.strip())
-            if data_list:
-                if data_list[0].upper() == 'SET':
-                    key=data_list[1]
-                    val=data_list[2]
-                    data_type = 'string'
-                    expiry =None
-                    if len(data_list) > 3:
-                        if data_list[3] == 'PX':
-                            expiry = datetime.now(timezone.utc) + timedelta(milliseconds=int(data_list[4]))
-                        elif data_list[3] == 'EX' :
-                            expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))                        
-                    RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type)
+        # for m_command in m_commands:
+        print(">>>AOF command = ",m_commands)
+        input_tokens=m_commands.splitlines()
+        no_of_elements=int(input_tokens[0].lstrip('*'))               
+        data_list=[]
+        if no_of_elements > 1:
+            for token in input_tokens:
+                if len(token)>1 and token.startswith('*'):                
+                    continue
+                if token.startswith('$') and token.strip() != '$':
+                    continue
+                data_list.append(token.strip())
+        if data_list:
+            if data_list[0].upper() == 'SET':
+                key=data_list[1]
+                val=data_list[2]
+                data_type = 'string'
+                expiry =None
+                if len(data_list) > 3:
+                    if data_list[3] == 'PX':
+                        expiry = datetime.now(timezone.utc) + timedelta(milliseconds=int(data_list[4]))
+                    elif data_list[3] == 'EX' :
+                        expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))                        
+                RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type)
 
 
 
