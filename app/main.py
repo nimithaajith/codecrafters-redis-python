@@ -1650,7 +1650,7 @@ def main():
         RedisAsyncServer.server.appenddirname=appenddirname
     if '--appendfilename' in sys.argv:        
         AOFFILENAME=args[args.index('--appendfilename')+1]
-        new_aof_file=AOFFILENAME.split('.')[0]+'.1.incr.'+AOFFILENAME.split('.')[1]
+        new_aof_file=AOFFILENAME+'.1.incr.aof' #+AOFFILENAME.split('.')[1]
         RedisAsyncServer.server.appendfilename=new_aof_file
     if '--appendfsync' in sys.argv:        
         aofsyncstat=args[args.index('--appendfsync')+1]
