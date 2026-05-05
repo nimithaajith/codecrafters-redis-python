@@ -1285,7 +1285,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     response = '*4\r\n$5\r\nflags\r\n*1\r\n$6\r\nnopass\r\n$9\r\npasswords\r\n*0\r\n'
                 else:
                     password=user.password
-                    response = f'*4\r\n$5\r\nflags\r\n*0\r\n$9\r\npasswords\r\n*1\r\n{len(password)}\r\n{password}\r\n'
+                    response = f'*4\r\n$5\r\nflags\r\n*0\r\n$9\r\npasswords\r\n*1\r\n${len(password)}\r\n{password}\r\n'
             elif data_list[1].upper() == 'SETUSER':
                 # ACL SETUSER default >mypassword
                 user_name=data_list[2]
