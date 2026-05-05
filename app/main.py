@@ -1660,9 +1660,14 @@ def main():
             aof_dir=os.path.join(RedisAsyncServer.server.dir,RedisAsyncServer.server.appenddirname)
             os.makedirs(aof_dir, exist_ok=True)
             new_aof_file=RedisAsyncServer.server.appendfilename+'.1.incr.aof' 
+            manifest_file=RedisAsyncServer.server.appendfilename+'.manifest'
             aof_filepath=os.path.join(aof_dir,new_aof_file)
             with open(aof_filepath,'w') as f:
                 print(f'AOF file created by master......')
+            manifest_file_path=os.path.join(aof_dir,manifest_file)
+            with open(manifest_file_path,'w') as mf:
+                data_str=f'file {new_aof_file} seq 1 type i'
+                print("Manifest file created and data written = ",mf.write(data_str))
             
         RedisAsyncServer.server.master_replid = '8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb'
         RedisAsyncServer.server.master_repl_offset = 0
