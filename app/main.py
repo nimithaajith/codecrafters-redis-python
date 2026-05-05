@@ -1718,7 +1718,9 @@ def main():
             manifest_file_path=os.path.join(aof_dir,manifest_file)
             with open(manifest_file_path,'a') as mf:
                 print(f'manifest file check by master')
-                pass
+                data_str=f'file {new_aof_file} seq 1 type i'
+                mf.write(data_str)
+                
                 # data_str=f'file {new_aof_file} seq 1 type i'
                 # print("Manifest file created and data written = ",mf.write(data_str))
             
