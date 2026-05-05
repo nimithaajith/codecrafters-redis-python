@@ -1258,6 +1258,9 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             else:
                 response=f'*0\r\n'
             print("response = ",response)
+
+        elif data_list[0].upper() == 'ACL' and data_list[1].upper() == 'WHOAMI':
+            response = '$7\r\ndefault\r\n'
         elif data_list[0] == 'TYPE': 
             key=data_list[1]
             if key in RedisAsyncServer.data_store.keys() :
