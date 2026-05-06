@@ -16,7 +16,8 @@ class User():
         self.flags=['nopass']
         self.password=''
         self.client_address=''
-user=User()
+
+
 class RedisServer():
     def __init__(self,role='master',port=6379):
         self.port= port
@@ -26,7 +27,7 @@ class RedisServer():
         self.master_port=None
         self.data_store={}
         self.server=Master()
-        self.users=[user]
+        self.users=[User()]
 
 class Replica():
     def __init__(self):
@@ -1332,13 +1333,13 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
 async def client_handler(reader,writer):
     try:
         client_addr = writer.get_extra_info('peername')  
-        users=RedisAsyncServer.users  
-        print('current users=',users)   
-        if len(users) ==1 :
-            user=users[0]
-            print("current user = ",user.username)
-            if user.username == 'default' :
-                if not user.client_address  :
+        userobjs=RedisAsyncServer.users  
+        print('current users=',userobjs)   
+        if len(userobjs) ==1 :
+            default_client=userobjs[0]
+            print("current user = ",default_client.username)
+            if default_client.username == 'default' :
+                if not default_client.client_address  :
                     print("Setting client address for default user")
                     RedisAsyncServer.users[0].client_address = client_addr 
         
@@ -1349,7 +1350,7 @@ async def client_handler(reader,writer):
         MULTI=[False,deque()]
         while CONNECT:
             input_query=await reader.read(1024)
-            if not utilities.allow_commands(users,client_addr):
+            if not utilities.allow_commands(userobjs,client_addr):
                 response='-NOAUTH Authentication required.'
                 writer.write(response.encode())
                 await writer.drain() 
