@@ -1353,7 +1353,7 @@ async def client_handler(reader,writer):
         while CONNECT:
             input_query=await reader.read(1024)
             if not utilities.allow_commands(userobjs,client_addr):
-                response='-NOAUTH Authentication required.'
+                response='-NOAUTH Authentication required.\r\n'
                 writer.write(response.encode())
                 await writer.drain() 
                 continue 
