@@ -27,7 +27,7 @@ class RedisServer():
         self.master_port=None
         self.data_store={}
         self.server=Master()
-        self.users=[User()]
+        self.clients=[]
 
 class Replica():
     def __init__(self):
@@ -1278,7 +1278,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             print("response = ",response)
 
         elif data_list[0].upper() == 'ACL':
-            current_users=RedisAsyncServer.users
+            current_users=RedisAsyncServer.clients
             if data_list[1].upper() == 'WHOAMI':
                 
                 response = '$7\r\ndefault\r\n'
@@ -1296,15 +1296,15 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 user_name=data_list[2]
                 if data_list[3].startswith('>'):
                     raw_password=str(data_list[3]).lstrip('>')
-                    current_users=RedisAsyncServer.users
+                    current_users=RedisAsyncServer.clients
                     for user in current_users:
                         if user.username == user_name:
-                            RedisAsyncServer.users.remove(user)
+                            RedisAsyncServer.clients.remove(user)
                             user.password = hashing.hash_password(raw_password)
                             flags=user.flags
                             if 'nopass' in flags:
                                 user.flags.remove('nopass') 
-                            RedisAsyncServer.users.append(user) 
+                            RedisAsyncServer.clients.append(user) 
                             break   
                 response='+OK\r\n'
         elif data_list[0].upper() == 'AUTH':
@@ -1312,7 +1312,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             user_name=data_list[1]
             user_pass=data_list[2]
             response='-WRONGPASS invalid username-password pair or user is disabled.\r\n'
-            for user in RedisAsyncServer.users:
+            for user in RedisAsyncServer.clients:
                 if user.username == user_name:
                     if user.password == hashing.hash_password(str(user_pass)):
                         response='+OK\r\n'
@@ -1333,7 +1333,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
 async def client_handler(reader,writer):
     try:
         client_addr = writer.get_extra_info('peername')  
-        userobjs=RedisAsyncServer.users  
+        userobjs=RedisAsyncServer.clients  
         print('current users=',userobjs)   
         if len(userobjs) ==1 :
             default_client=userobjs[0]
@@ -1341,7 +1341,7 @@ async def client_handler(reader,writer):
             if default_client.username == 'default' :
                 if not default_client.client_address  :
                     print("Setting client address for default user")
-                    RedisAsyncServer.users[0].client_address = client_addr 
+                    RedisAsyncServer.clients[0].client_address = client_addr 
         
         print("Connected...",client_addr,RedisAsyncServer.role) 
         CONNECT = True
@@ -1766,6 +1766,7 @@ def main():
             port_number=6379
     else:
         port_number=6379
+    RedisAsyncServer.clients.append(User())
     if '--replicaof' in sys.argv:
         try:
             RedisAsyncServer.role='slave'
