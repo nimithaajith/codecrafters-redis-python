@@ -1337,7 +1337,7 @@ async def client_handler(reader,writer):
         print('current users=',userobjs)   
         if len(userobjs) ==1 :
             default_client=userobjs[0]
-            print("current user = ",default_client.username)
+            print("current user = ",default_client.username,type(default_client))
             if default_client.username == 'default' :
                 if not default_client.client_address  :
                     print("Setting client address for default user")
