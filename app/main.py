@@ -15,7 +15,7 @@ class User():
         self.username='default'
         self.flags=['nopass']
         self.password=''
-        self.client_address=''
+        self.client_address=[]
 
 
 class RedisServer():
@@ -1316,6 +1316,9 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 if user.username == user_name:
                     if user.password == hashing.hash_password(str(user_pass)):
                         response='+OK\r\n'
+                        if not utilities.client_exists(RedisAsyncServer.clients,client_addr):
+                            RedisAsyncServer.clients=utilities.add_client(user_name,RedisAsyncServer.clients,client_addr)
+
                         break                    
 
         elif data_list[0] == 'TYPE': 
@@ -1340,7 +1343,8 @@ async def client_handler(reader,writer):
             print("current user = ",default_client.username,type(default_client))
             if default_client.username == 'default' :
                 if not hasattr(default_client, 'client_address') or not default_client.client_address:
-                    default_client.client_address = client_addr
+                    default_client.client_address = []
+                    default_client.client_address.append(client_addr)
                     RedisAsyncServer.clients[0] = default_client 
                 
                  
@@ -1352,11 +1356,11 @@ async def client_handler(reader,writer):
         MULTI=[False,deque()]
         while CONNECT:
             input_query=await reader.read(1024)
-            if not utilities.allow_commands(userobjs,client_addr):
-                response='-NOAUTH Authentication required.\r\n'
-                writer.write(response.encode())
-                await writer.drain() 
-                continue 
+            # if not utilities.allow_commands(userobjs,client_addr):
+            #     response='-NOAUTH Authentication required.\r\n'
+            #     writer.write(response.encode())
+            #     await writer.drain() 
+            #     continue 
             # if not utilities.client_exists(users,client_addr):
             #     new_user=User()
             #     new_user.client_address = client_addr
@@ -1365,6 +1369,12 @@ async def client_handler(reader,writer):
                 await asyncio.sleep(0.2)
                 continue
             query_string=str(input_query.decode()) 
+            if not utilities.allow_commands(userobjs,client_addr):
+                if 'AUTH' not in query_string.splitlines():
+                    response='-NOAUTH Authentication required.\r\n'
+                    writer.write(response.encode())
+                    await writer.drain() 
+                    continue 
             print(">>>>>>>query_string : ",query_string)
             if query_string == '*2\r\n$4\r\nKEYS\r\n$3\r\n"*"\r\n':
                 if RedisAsyncServer.data_store:
