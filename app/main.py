@@ -1335,8 +1335,10 @@ async def client_handler(reader,writer):
         users=RedisAsyncServer.users  
         print('current users=',users)   
         if len(users) ==1 :
-            if users[0].username == 'default' :
-                if not users[0].client_address  :
+            user=users[0]
+            print("current user = ",user.username)
+            if user.username == 'default' :
+                if not user.client_address  :
                     print("Setting client address for default user")
                     RedisAsyncServer.users[0].client_address = client_addr 
         
@@ -1352,6 +1354,10 @@ async def client_handler(reader,writer):
                 writer.write(response.encode())
                 await writer.drain() 
                 continue 
+            # if not utilities.client_exists(users,client_addr):
+            #     new_user=User()
+            #     new_user.client_address = client_addr
+
             if not input_query:
                 await asyncio.sleep(0.2)
                 continue
