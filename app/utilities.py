@@ -8,7 +8,7 @@ def add_client(username,userobjs,client_address):
     for obj in userobjs:
         if username == obj.username:
             userobjs.remove(obj)
-            obj.clients.append(client_address)
+            obj.client_address.append(client_address)
             userobjs.append(obj)
     return userobjs
 
