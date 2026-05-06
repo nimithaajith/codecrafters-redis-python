@@ -9,11 +9,13 @@ import shutil
 from . import geo_encode
 from . import distance
 from . import hashing
+from . import utilities
 class User():
     def __init__(self):
         self.username='default'
         self.flags=['nopass']
         self.password=''
+        self.client_address=None
 user=User()
 class RedisServer():
     def __init__(self,role='master',port=6379):
@@ -1275,11 +1277,13 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             print("response = ",response)
 
         elif data_list[0].upper() == 'ACL':
+            current_users=RedisAsyncServer.users
             if data_list[1].upper() == 'WHOAMI':
+                
                 response = '$7\r\ndefault\r\n'
             elif data_list[1].upper() == 'GETUSER':
                 user_name=data_list[2]
-                user=RedisAsyncServer.users[0]
+                user=current_users[0]
                 flags=user.flags
                 if 'nopass' in flags:
                     response = '*4\r\n$5\r\nflags\r\n*1\r\n$6\r\nnopass\r\n$9\r\npasswords\r\n*0\r\n'
@@ -1327,7 +1331,12 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
 
 async def client_handler(reader,writer):
     try:
-        client_addr = writer.get_extra_info('peername')       
+        client_addr = writer.get_extra_info('peername')  
+        users=RedisAsyncServer.users     
+        if len(users) ==1 :
+            if users[0].username == 'default' :
+                if users[0].client_address is None :
+                    RedisAsyncServer.users[0].client_address = client_addr 
         
         print("Connected...",client_addr,RedisAsyncServer.role) 
         CONNECT = True
@@ -1336,6 +1345,11 @@ async def client_handler(reader,writer):
         MULTI=[False,deque()]
         while CONNECT:
             input_query=await reader.read(1024)
+            if not utilities.allow_commands(users,client_addr):
+                response='-NOAUTH Authentication required.'
+                writer.write(response.encode())
+                await writer.drain() 
+                continue 
             if not input_query:
                 await asyncio.sleep(0.2)
                 continue
