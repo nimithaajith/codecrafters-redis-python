@@ -15,7 +15,7 @@ class User():
         self.username='default'
         self.flags=['nopass']
         self.password=''
-        self.client_address=None
+        self.client_address=''
 user=User()
 class RedisServer():
     def __init__(self,role='master',port=6379):
@@ -1332,10 +1332,12 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
 async def client_handler(reader,writer):
     try:
         client_addr = writer.get_extra_info('peername')  
-        users=RedisAsyncServer.users     
+        users=RedisAsyncServer.users  
+        print('current users=',users)   
         if len(users) ==1 :
             if users[0].username == 'default' :
-                if users[0].client_address is None :
+                if not users[0].client_address  :
+                    print("Setting client address for default user")
                     RedisAsyncServer.users[0].client_address = client_addr 
         
         print("Connected...",client_addr,RedisAsyncServer.role) 
