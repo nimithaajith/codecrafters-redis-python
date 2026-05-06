@@ -1339,9 +1339,11 @@ async def client_handler(reader,writer):
             default_client=userobjs[0]
             print("current user = ",default_client.username,type(default_client))
             if default_client.username == 'default' :
-                if not default_client.client_address  :
-                    print("Setting client address for default user")
-                    RedisAsyncServer.clients[0].client_address = client_addr 
+                if not hasattr(default_client, 'client_address') or not default_client.client_address:
+                    default_client.client_address = client_addr
+                    RedisAsyncServer.clients[0] = default_client 
+                
+                 
         
         print("Connected...",client_addr,RedisAsyncServer.role) 
         CONNECT = True
