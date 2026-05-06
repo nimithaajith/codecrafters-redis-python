@@ -1312,6 +1312,9 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             user_name=data_list[1]
             user_pass=data_list[2]
             response='-WRONGPASS invalid username-password pair or user is disabled.\r\n'
+            if not hasattr(RedisAsyncServer,'clients'):
+                RedisAsyncServer.clients=[]
+                RedisAsyncServer.clients.append(User())
             for user in RedisAsyncServer.clients:
                 if user.username == user_name:
                     if user.password == hashing.hash_password(str(user_pass)):
