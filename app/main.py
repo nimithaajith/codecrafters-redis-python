@@ -1231,6 +1231,12 @@ async def client_handler(reader,writer):
                     writer.write(response.encode())
                     await writer.drain() 
                     continue 
+            if input_tokens[2].upper() == 'WATCH' : 
+                key=input_tokens[4]
+                response=b'+OK\r\n'
+                writer.write(response)
+                await writer.drain() 
+                continue 
             if input_tokens[2].upper() == 'MULTI' : 
                 MULTI[0]  = True
                 response =b'+OK\r\n'
