@@ -1291,6 +1291,7 @@ async def client_handler(reader,writer):
             if MULTI[0] :
                 print('status = multi enabled')                
                 if input_tokens[2].strip().upper() == 'EXEC':
+                    print('exec command ......')
                     if len(MULTI[1]) ==0 :
                         print('status = multi enabled,no queued command, got EXEC')
                         response=f'*0\r\n'
@@ -1300,10 +1301,13 @@ async def client_handler(reader,writer):
                         continue
                     else:
                         que_length=len(MULTI[1])
-                        response =f'*{que_length}\r\n'
+                        print('que_length =',que_length)
                         Abort=False
-                        while len(MULTI[1]) > 0 :                            
-                            query_string=MULTI[1].popleft()
+                        cnt=0
+                        while len(MULTI[1]) > cnt : 
+                                                       
+                            print('ckecking for modified keys')
+                            query_string=MULTI[1][cnt]
                             input_tokens=query_string.splitlines()  
                             cmd_key=input_tokens[4]
                             for c_address in transaction_lock.locks:
@@ -1315,7 +1319,8 @@ async def client_handler(reader,writer):
                                                 Abort=True
                                                 break
                             if Abort:
-                                break                
+                                break 
+                            cnt = cnt+1               
                         if Abort:
                             print("Aborting EXEC command..........")
                             MULTI[1].clear()
@@ -1325,6 +1330,7 @@ async def client_handler(reader,writer):
                             print("$$$$$$RESPONSE::::",response)
                             await writer.drain() 
                             continue
+                        response =f'*{que_length}\r\n'
                         while len(MULTI[1]) > 0 :                            
                             query_string=MULTI[1].popleft()
                             input_tokens=query_string.splitlines()                            
