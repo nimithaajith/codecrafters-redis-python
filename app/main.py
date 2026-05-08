@@ -1310,14 +1310,12 @@ async def client_handler(reader,writer):
                             query_string=MULTI[1][cnt]
                             input_tokens=query_string.splitlines()  
                             cmd_key=input_tokens[4]
-                            for c_address in transaction_lock.locks:
-                                if c_address == client_addr:
-                                    if transaction_lock.locks[c_address]:
-                                        for key,state in transaction_lock.locks[c_address]:
-                                            if key == cmd_key and state :
-                                                print(f"{cmd_key} got modified......")
-                                                Abort=True
-                                                break
+                            if client_addr in transaction_lock.locks:                             
+                                for key,state in transaction_lock.locks[client_addr]:
+                                    if key == cmd_key and state :
+                                        print(f"{cmd_key} got modified......")
+                                        Abort=True
+                                        break
                             if Abort:
                                 break 
                             cnt = cnt+1               
