@@ -1315,7 +1315,7 @@ async def client_handler(reader,writer):
                         if Abort:
                             MULTI[1].clear()
                             MULTI[0]=False
-                            response=b'*-1\r\n'
+                            response=b'*0\r\n'
                             writer.write(response)
                             print("$$$$$$RESPONSE::::",response)
                             await writer.drain() 
