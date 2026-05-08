@@ -1310,9 +1310,11 @@ async def client_handler(reader,writer):
                                     if transaction_lock.locks[c_address]:
                                         for key,state in transaction_lock.locks[c_address]:
                                             if key == cmd_key and state :
+                                                print(f"{cmd_key} got modified......")
                                                 Abort=True
                                                 break
                         if Abort:
+                            print("Aborting EXEC command..........")
                             MULTI[1].clear()
                             MULTI[0]=False
                             response=b'*0\r\n'
