@@ -1282,11 +1282,12 @@ async def client_handler(reader,writer):
                 await writer.drain() 
                 continue 
             if input_tokens[2].upper() == 'MULTI' : 
-                MULTI[0]  = True
-                response =b'+OK\r\n'
-                writer.write(response)
-                await writer.drain() 
-                continue 
+                if not MULTI[0]:
+                    MULTI[0]  = True
+                    response =b'+OK\r\n'
+                    writer.write(response)
+                    await writer.drain() 
+                    continue 
             if MULTI[0] :
                 print('status = multi enabled')                
                 if input_tokens[2].strip().upper() == 'EXEC':
@@ -1313,11 +1314,13 @@ async def client_handler(reader,writer):
                                                 print(f"{cmd_key} got modified......")
                                                 Abort=True
                                                 break
+                            if Abort:
+                                break                
                         if Abort:
                             print("Aborting EXEC command..........")
                             MULTI[1].clear()
                             MULTI[0]=False
-                            response=b'*0\r\n'
+                            response=b'*-1\r\n'
                             writer.write(response)
                             print("$$$$$$RESPONSE::::",response)
                             await writer.drain() 
