@@ -1328,17 +1328,18 @@ async def client_handler(reader,writer):
                             print("$$$$$$RESPONSE::::",response)
                             await writer.drain() 
                             continue
-                        response =f'*{que_length}\r\n'
-                        while len(MULTI[1]) > 0 :                            
-                            query_string=MULTI[1].popleft()
-                            input_tokens=query_string.splitlines()                            
-                            cmd_response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,input_tokens)
-                            response = response+ f'{cmd_response}'
-                        writer.write(response.encode())
-                        print("$$$$$$RESPONSE::::",response)
-                        await writer.drain() 
-                        MULTI[0]=False
-                        continue
+                        else:
+                            response =f'*{que_length}\r\n'
+                            while len(MULTI[1]) > 0 :                            
+                                query_string=MULTI[1].popleft()
+                                input_tokens=query_string.splitlines()                            
+                                cmd_response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,input_tokens)
+                                response = response+ f'{cmd_response}'
+                            writer.write(response.encode())
+                            print("$$$$$$RESPONSE::::",response)
+                            await writer.drain() 
+                            MULTI[0]=False
+                            continue
                 else:
                     if input_tokens[2].upper() == 'DISCARD' : 
                         MULTI[0]=False
