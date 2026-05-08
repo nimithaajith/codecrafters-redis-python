@@ -1234,7 +1234,7 @@ async def client_handler(reader,writer):
                     continue 
             if input_tokens[2].upper() == 'WATCH' : 
                 if MULTI[0] :
-                    response=b'-ERR WATCH inside MULTI is not allowed'
+                    response=b'-ERR WATCH inside MULTI is not allowed\r\n'
                     writer.write(response)
                     await writer.drain() 
                     continue 
