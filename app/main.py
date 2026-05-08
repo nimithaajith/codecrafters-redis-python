@@ -1233,7 +1233,7 @@ async def client_handler(reader,writer):
                     await writer.drain() 
                     continue 
             if input_tokens[2].upper() == 'WATCH' : 
-                if MULTI[0] and WATCH :
+                if MULTI[0] :
                     response=b'-ERR WATCH inside MULTI is not allowed'
                     writer.write(response)
                     await writer.drain() 
