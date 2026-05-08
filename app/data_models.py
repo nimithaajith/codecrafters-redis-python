@@ -1,5 +1,8 @@
 from collections import deque
 
+class Transaction():
+    locks={}
+
 class User():
     def __init__(self):
         self.username='default'

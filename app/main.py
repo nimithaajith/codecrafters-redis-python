@@ -6,7 +6,7 @@ import os
 import shutil
 from . import geo_encode,distance,hashing,utilities
 from . import distance
-from .data_models import User,RedisServer,Replica,Master,StreamEntry,RedisObject
+from .data_models import User,RedisServer,Replica,Master,StreamEntry,RedisObject,Transaction
 from .utilities import get_last_stream_key, get_next_stream_key, get_xrange_response
 
 #globals
@@ -14,6 +14,8 @@ RedisAsyncServer=RedisServer()
 channel_subscriptions={}
 CommandDeque=deque()
 xread_stream_block_que=defaultdict(list)
+transaction_lock=Transaction()
+
     
 #initialize datastore from RDB snapshot instance
 def initialize_data_store():
@@ -289,6 +291,26 @@ async def process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaite
                 replica_temp_list.remove(s_writer)
     return synced_replicas,replica_temp_list
 
+async def check_and_update_locks(modified_data):
+    m_key,this_client=modified_data
+    for c_adrs in transaction_lock.locks:
+        if c_adrs != this_client :
+            locked_key_data=transaction_lock.locks[c_adrs]
+            i=0
+            l=len(locked_key_data)
+            while i<l:
+                key,state=locked_key_data[i]            
+                if key == m_key:
+                    if not state:
+                        transaction_lock.locks[c_adrs][i] = [key,True]
+                        print('======================LOCK UPDATE===================================')
+                        print(f'{this_client} client modified key {key} locked by client {c_adrs}')
+                        break
+                i=i+1    
+            
+
+
+
 async def propagate_getack_command(replica_temp_list):
     cmd_encoded= b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n'
     for s_writer in RedisAsyncServer.server.ReplicaList.keys():
@@ -353,7 +375,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
     print(input_tokens)
     no_of_elements=int(input_tokens[0].lstrip('*'))               
     data_list=[]
-
+    modified_key=[]
     if no_of_elements == 1:
         if input_tokens[2] == 'PING':
             response=f"+PONG\r\n"
@@ -462,6 +484,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))
                 
             RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type) 
+            modified_key=[key,client_addr]
             print(f'{server_role} set the new value !!!!')
             if server_role == 'master' :
                 if RedisAsyncServer.server.appendfsync == 'always':
@@ -518,6 +541,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     response="-ERR value is not an integer or out of range\r\n"
             else:
                 RedisAsyncServer.data_store[key] = RedisObject(data = '1',data_type='string') 
+                modified_key=[key,client_addr]
                 response =f':1\r\n'
             # writer.write(response.encode())
             # await writer.drain() 
@@ -549,6 +573,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             if new_data_list:
                 for new_data in new_data_list:
                     redis_obj.data.insert(0,new_data) 
+                modified_key=[key,client_addr]
             if redis_obj.blocked_clients and redis_obj.data:
                 pass                    
             response=f':{n}\r\n'
@@ -565,6 +590,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             if new_data_list:
                 for new_data in new_data_list:
                     redis_obj.data.append(new_data) 
+                modified_key=[key,client_addr]
                 
             if redis_obj.blocked_clients and redis_obj.data:
                 pass
@@ -629,6 +655,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 if redis_obj.data:
                     # if data is available , send it to client immediately
                     ele=redis_obj.data.pop(0)
+                    modified_key=[key,client_addr]
                     length=len(ele)
                     response=f'*2\r\n${len(key)}\r\n{key}\r\n${length}\r\n{ele}\r\n' 
                     print('###RESPONSE TO BLPOP CLIENT###')
@@ -695,6 +722,8 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                                                             
             if length == 0:
                 response=f'$-1\r\n'
+            else:
+                modified_key=[key,client_addr]
             # print('###RESPONSE###')
             # print(response)
             # writer.write(response.encode())
@@ -753,7 +782,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 new_stream_entry.add_entry(l)                       
             
                 redis_obj.data.append(new_stream_entry)
-                
+                modified_key=[key,client_addr]
                 response=f'${len(stream_key)}\r\n{stream_key}\r\n'  
             else:
                 response = message
@@ -859,6 +888,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             new_sorted_data  = sorted(updated_data,key=lambda x : (x[0],x[1])) 
             print("new data = ",new_sorted_data)
             RedisAsyncServer.data_store[key].data =new_sorted_data  
+            modified_key=[key,client_addr]
             if response is None:
                 response=':1\r\n' 
         elif data_list[0].lower() == 'zrank':
@@ -962,7 +992,8 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 for l in old_data:
                     if l[1] == member : 
                         old_data.remove(l) 
-                        RedisAsyncServer.data_store[key].data =old_data                                                                  
+                        RedisAsyncServer.data_store[key].data =old_data  
+                        modified_key=[key,client_addr]                                                                
                         response=':1\r\n' 
                         is_member = True                      
                         break
@@ -1008,6 +1039,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 new_sorted_data  = sorted(updated_data,key=lambda x : (x[0],x[1])) 
                 print("new data = ",new_sorted_data)
                 RedisAsyncServer.data_store[key].data =new_sorted_data  
+                modified_key=[key,client_addr]
                 if response is None:
                     response=':1\r\n' 
 
@@ -1147,7 +1179,9 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             else:
                 response=f'+none\r\n'
             # writer.write(response.encode())
-            # await writer.drain()  
+            # await writer.drain() 
+    if modified_key:
+        await check_and_update_locks(modified_key) 
     return response                                         
     
 
@@ -1167,7 +1201,7 @@ async def client_handler(reader,writer):
         print("Connected...",client_addr,RedisAsyncServer.role) 
         CONNECT = True        
         # multi command enabled, queue to hold upcoming commands
-        WATCH=[]
+        transaction_lock.locks[client_addr]=[]
         MULTI=[False,deque()]
         while CONNECT:
             input_query=await reader.read(1024)
@@ -1239,7 +1273,10 @@ async def client_handler(reader,writer):
                     await writer.drain() 
                     continue 
                 key=input_tokens[4]
-                WATCH.append(key)
+                #locks keep track of key and if modified or not state
+                #state will be set as true if any other client modifies this key after this
+                keystatelst=[key,False]
+                transaction_lock.locks[client_addr].append(keystatelst)
                 response=b'+OK\r\n'
                 writer.write(response)
                 await writer.drain() 
@@ -1263,9 +1300,29 @@ async def client_handler(reader,writer):
                     else:
                         que_length=len(MULTI[1])
                         response =f'*{que_length}\r\n'
+                        Abort=False
                         while len(MULTI[1]) > 0 :                            
                             query_string=MULTI[1].popleft()
-                            input_tokens=query_string.splitlines()
+                            input_tokens=query_string.splitlines()  
+                            cmd_key=input_tokens[4]
+                            for c_address in transaction_lock.locks:
+                                if c_address == client_addr:
+                                    if transaction_lock.locks[c_address]:
+                                        for key,state in transaction_lock.locks[c_address]:
+                                            if key == cmd_key and state :
+                                                Abort=True
+                                                break
+                        if Abort:
+                            MULTI[1].clear()
+                            MULTI[0]=False
+                            response=b'*-1\r\n'
+                            writer.write(response)
+                            print("$$$$$$RESPONSE::::",response)
+                            await writer.drain() 
+                            continue
+                        while len(MULTI[1]) > 0 :                            
+                            query_string=MULTI[1].popleft()
+                            input_tokens=query_string.splitlines()                            
                             cmd_response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,input_tokens)
                             response = response+ f'{cmd_response}'
                         writer.write(response.encode())
