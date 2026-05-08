@@ -1167,6 +1167,7 @@ async def client_handler(reader,writer):
         print("Connected...",client_addr,RedisAsyncServer.role) 
         CONNECT = True        
         # multi command enabled, queue to hold upcoming commands
+        WATCH=[]
         MULTI=[False,deque()]
         while CONNECT:
             input_query=await reader.read(1024)
@@ -1232,7 +1233,13 @@ async def client_handler(reader,writer):
                     await writer.drain() 
                     continue 
             if input_tokens[2].upper() == 'WATCH' : 
+                if MULTI[0] and WATCH :
+                    response=b'-ERR WATCH inside MULTI is not allowed'
+                    writer.write(response)
+                    await writer.drain() 
+                    continue 
                 key=input_tokens[4]
+                WATCH.append(key)
                 response=b'+OK\r\n'
                 writer.write(response)
                 await writer.drain() 
