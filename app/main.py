@@ -297,7 +297,7 @@ async def process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaite
                 replica_temp_list.remove(s_writer)
     return synced_replicas,replica_temp_list
 
-async def check_and_update_locks(modified_data):
+def check_and_update_locks(modified_data):
     m_key,this_client=modified_data
     for c_adrs in transaction_lock.locks:
         if c_adrs != this_client :
@@ -1190,7 +1190,8 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             # writer.write(response.encode())
             # await writer.drain() 
     if modified_key:
-        await check_and_update_locks(modified_key) 
+        print("calling check and update lock")
+        check_and_update_locks(modified_key) 
     return response                                         
     
 
@@ -1288,7 +1289,7 @@ async def client_handler(reader,writer):
                 while i < no_of_watched_keys:
                     watched_keys.append(input_tokens[i])
                     i=i+2
-
+                print("watched_keys =",watched_keys)
                 #locks keep track of key and if modified or not state
                 #state will be set as true if any other client modifies this key after this
                 for watched_k in watched_keys:
