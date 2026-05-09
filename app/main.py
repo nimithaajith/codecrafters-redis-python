@@ -1298,21 +1298,25 @@ async def client_handler(reader,writer):
                         MULTI[0] = False
                         writer.write(response.encode())
                         await writer.drain()
-                        continue
+                        # continue
                     else:
                         que_length=len(MULTI[1])
-                        print('que_length =',que_length)
+                        print('No of commands queued =',que_length)
                         Abort=False
                         cnt=0
-                        while len(MULTI[1]) > cnt : 
-                                                       
+                        print("transaction_lock.locks =",transaction_lock.locks)
+                        print("client_addr =",client_addr)
+                        while cnt < len(MULTI[1]) :                                                        
                             print('ckecking for modified keys')
                             query_string=MULTI[1][cnt]
                             input_tokens=query_string.splitlines()  
-                            cmd_key=input_tokens[4]
-                            if client_addr in transaction_lock.locks:                             
-                                for key,state in transaction_lock.locks[client_addr]:
-                                    if key == cmd_key and state :
+                            cmd_key=input_tokens[4]                            
+                            print("checking key ->", cmd_key)
+                            if client_addr in transaction_lock.locks:  
+                                print(f"{client_addr} found...")                           
+                                for k,s in transaction_lock.locks[client_addr]:
+                                    print(f"checking key ={k} ,state = {s}...")   
+                                    if (k == cmd_key) and s :
                                         print(f"{cmd_key} got modified......")
                                         Abort=True
                                         break
@@ -1325,9 +1329,9 @@ async def client_handler(reader,writer):
                             MULTI[0]=False
                             response=b'*-1\r\n'
                             writer.write(response)
-                            print("$$$$$$RESPONSE::::",response)
+                            print("Aborted, RESPONSE:",response)
                             await writer.drain() 
-                            continue
+                            
                         else:
                             response =f'*{que_length}\r\n'
                             while len(MULTI[1]) > 0 :                            
@@ -1336,10 +1340,10 @@ async def client_handler(reader,writer):
                                 cmd_response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,input_tokens)
                                 response = response+ f'{cmd_response}'
                             writer.write(response.encode())
-                            print("$$$$$$RESPONSE::::",response)
+                            print("multi not aborted , RESPONSE =",response)
                             await writer.drain() 
                             MULTI[0]=False
-                            continue
+                    continue
                 else:
                     if input_tokens[2].upper() == 'DISCARD' : 
                         MULTI[0]=False
