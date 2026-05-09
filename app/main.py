@@ -10,7 +10,7 @@ from .data_models import User,RedisServer,Replica,Master,StreamEntry,RedisObject
 from .utilities import get_last_stream_key, get_next_stream_key, get_xrange_response
 
 #globals
-global RedisAsyncServer
+RedisAsyncServer=None
 channel_subscriptions={}
 CommandDeque=deque()
 xread_stream_block_que=defaultdict(list)
@@ -1666,14 +1666,15 @@ async def run_server(port_number):
 
 import sys
 def main():
+    global RedisAsyncServer
     master_details=''
     port_number=6379
     args=sys.argv
     if '--replicaof' in sys.argv:
-        global RedisAsyncServer
+        
         RedisAsyncServer=Replica()
     else:
-        global RedisAsyncServer
+        
         RedisAsyncServer=Master()
     if '--port' in sys.argv:
         try:            
