@@ -20,6 +20,7 @@ transaction_lock=Transaction()
 #initialize datastore from RDB snapshot instance
 def initialize_data_store():
     try:
+        global RedisAsyncServer
         rdb_dir=RedisAsyncServer.rdb_dir
         rdb_filename=RedisAsyncServer.rdb_filename
         os.makedirs(rdb_dir, exist_ok=True)
@@ -130,6 +131,7 @@ def initialize_data_store():
 
 
 async def blocked_client_handler():
+    global RedisAsyncServer
     print("############blocked_client_handler#############")
     while True:
         
@@ -156,6 +158,7 @@ async def blocked_client_handler():
 
                     
 async def get_blpop_response(client_tuple) :
+    global RedisAsyncServer
     key =client_tuple[2]
     redis_obj=RedisAsyncServer.data_store[key]
     SERVERD=False
@@ -248,6 +251,7 @@ async def get_data_type(val):
 
 
 async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
+    global RedisAsyncServer
     while True:        
         #return response,expired
         if datetime.now(timezone.utc) >= expires_on :
@@ -266,6 +270,7 @@ async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
         await asyncio.sleep(0.01)
 
 async def propagate_command():
+    global RedisAsyncServer
     while len(CommandDeque)>0:
         command_str=CommandDeque.popleft()
         # print(">>>PROPAGATING>>>>writer status ",command_str)
@@ -284,6 +289,7 @@ async def propagate_command():
             # await asyncio.sleep(0.001)
 
 async def process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaited_replicas):
+    global RedisAsyncServer
     for s_writer in RedisAsyncServer.ReplicaList.keys():
         if s_writer in replica_temp_list:
             if RedisAsyncServer.ReplicaList[s_writer][1]:
@@ -312,6 +318,7 @@ async def check_and_update_locks(modified_data):
 
 
 async def propagate_getack_command(replica_temp_list):
+    global RedisAsyncServer
     cmd_encoded= b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n'
     for s_writer in RedisAsyncServer.ReplicaList.keys():
         if s_writer in replica_temp_list:                
@@ -326,6 +333,7 @@ async def propagate_getack_command(replica_temp_list):
 
             
 async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
+    global RedisAsyncServer
     replica_temp_list=list(RedisAsyncServer.ReplicaList.keys()) 
     synced_replicas=0    
     while True:
@@ -370,6 +378,7 @@ async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
     
 from . import geo_decode
 async def command_handler(writer,client_addr,server_role,query_string,input_tokens):
+    global RedisAsyncServer
     input_tokens=query_string.splitlines()
     print('>>>>inside command_handler<<<<<')
     print(input_tokens)
@@ -1187,6 +1196,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
 
 async def client_handler(reader,writer):
     try:
+        global RedisAsyncServer
         client_addr = writer.get_extra_info('peername')  
         userobjs=RedisAsyncServer.clients  
         print('current users=',userobjs)   
@@ -1432,6 +1442,7 @@ async def client_handler(reader,writer):
 
 
 async def command_propagation_handler():
+    global RedisAsyncServer
     print('inside command_propagation_handler',)
     command_offset=0
     try:
@@ -1589,6 +1600,7 @@ async def command_propagation_handler():
 
 
 def aof_replay_file(aof_path,line) :
+    global RedisAsyncServer
     m_commands=None
     aof_file_name=line.split()[1]    
     aof_file=os.path.join(aof_path,aof_file_name)
@@ -1641,6 +1653,7 @@ def aof_replay_file(aof_path,line) :
 
 async def run_server(port_number):
     try:
+        global RedisAsyncServer
         redis_server=await asyncio.start_server(client_handler,host="localhost",port=port_number)
         print(f'Redis server listening {redis_server.sockets[0].getsockname()}')
         RedisAsyncServer.port =port_number
@@ -1657,8 +1670,10 @@ def main():
     port_number=6379
     args=sys.argv
     if '--replicaof' in sys.argv:
+        global RedisAsyncServer
         RedisAsyncServer=Replica()
     else:
+        global RedisAsyncServer
         RedisAsyncServer=Master()
     if '--port' in sys.argv:
         try:            
