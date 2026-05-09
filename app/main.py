@@ -1302,27 +1302,17 @@ async def client_handler(reader,writer):
                     else:
                         que_length=len(MULTI[1])
                         print('No of commands queued =',que_length)
-                        Abort=False
-                        cnt=0
-                        print("transaction_lock.locks =",transaction_lock.locks)
-                        print("client_addr =",client_addr)
-                        while cnt < len(MULTI[1]) :                                                        
-                            print('ckecking for modified keys')
-                            query_string=MULTI[1][cnt]
-                            input_tokens=query_string.splitlines()  
-                            cmd_key=input_tokens[4]                            
-                            print("checking key ->", cmd_key)
-                            if client_addr in transaction_lock.locks:  
-                                print(f"{client_addr} found...")                           
-                                for k,s in transaction_lock.locks[client_addr]:
-                                    print(f"checking key ={k} ,state = {s}...")   
-                                    if (k == cmd_key) and s :
-                                        print(f"{cmd_key} got modified......")
-                                        Abort=True
-                                        break
-                            if Abort:
-                                break 
-                            cnt = cnt+1               
+                        Abort=False                                                              
+                        print('ckecking for modified keys')                     
+                        if client_addr in transaction_lock.locks:  
+                            print(f"{client_addr} found...")                           
+                            for k,s in transaction_lock.locks[client_addr]:
+                                print(f"checking key ={k} ,state = {s}...")   
+                                if s :
+                                    print(f"{k} got modified......")
+                                    Abort=True
+                                    break
+                                        
                         if Abort:
                             print("Aborting EXEC command..........")
                             MULTI[1].clear()
