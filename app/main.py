@@ -924,7 +924,7 @@ async def client_handler(reader,writer):
                 if client_addr in transaction_lock.locks:
                     transaction_lock.locks[client_addr].clear()
                 respone=b'+OK\r\n'
-                writer.write(response.encode())
+                writer.write(respone)
                 await writer.drain() 
                 continue 
             if data_list[0].upper() == 'WATCH' : 
