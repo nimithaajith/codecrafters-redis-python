@@ -11,23 +11,25 @@ class User():
         self.client_address=[]
 
 class RedisServer():
-    def __init__(self,role='master',port=6379):
+    def __init__(self,role,port=6379):
         self.port= port
         self.host='localhost'
         self.role = role        
         self.master_host=None
         self.master_port=None
         self.data_store={}
-        self.server=Master()
+        # self.server=Master()
         self.clients=[]
 
-class Replica():
+class Replica(RedisServer):
     def __init__(self):
+        super().__init__(role='slave' )
         self.replica_command_offset=0
         print('replica offset initialized to 0')
         
-class Master():
+class Master(RedisServer):
     def __init__(self):
+        super().__init__(role='master')
         self.rdb_filename=None
         self.rdb_dir=None
         self.dir='/app'
@@ -41,6 +43,7 @@ class Master():
         # dict of Lists,key is slave-writer,value is list(replica's offset,sync)
         # sync is true means replica's offset and  replica server's replica_command_offset are same
         self.ReplicaList={}
+
     def get_type(self,value):
         if value == 0:
             return 'string'

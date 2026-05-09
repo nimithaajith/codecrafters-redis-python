@@ -10,7 +10,7 @@ from .data_models import User,RedisServer,Replica,Master,StreamEntry,RedisObject
 from .utilities import get_last_stream_key, get_next_stream_key, get_xrange_response
 
 #globals
-RedisAsyncServer=RedisServer()
+RedisAsyncServer=None
 channel_subscriptions={}
 CommandDeque=deque()
 xread_stream_block_que=defaultdict(list)
@@ -20,8 +20,8 @@ transaction_lock=Transaction()
 #initialize datastore from RDB snapshot instance
 def initialize_data_store():
     try:
-        rdb_dir=RedisAsyncServer.server.rdb_dir
-        rdb_filename=RedisAsyncServer.server.rdb_filename
+        rdb_dir=RedisAsyncServer.rdb_dir
+        rdb_filename=RedisAsyncServer.rdb_filename
         os.makedirs(rdb_dir, exist_ok=True)
         filepath=os.path.join(rdb_dir,rdb_filename)
         basedir="C:\\Users\\Ardra\\codecrafters-redis-python"
@@ -68,7 +68,7 @@ def initialize_data_store():
                             expiry = datetime.fromtimestamp(expires_on_sec,tz=timezone.utc)
                             # expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_on_sec)                
                             value_type= rdbfile.read(1)[0]
-                            type = RedisAsyncServer.server.get_type(value_type)
+                            type = RedisAsyncServer.get_type(value_type)
                             key_len=rdbfile.read(1)[0]
                             key=rdbfile.read(key_len).decode()
                             val_len=rdbfile.read(1)[0]
@@ -87,7 +87,7 @@ def initialize_data_store():
                             expiry = datetime.fromtimestamp(expires_on_msec / 1000,tz=timezone.utc)
                             # expiry = datetime.now(timezone.utc) + timedelta(milliseconds=expires_on_sec)
                             value_type= rdbfile.read(1)[0]
-                            type = RedisAsyncServer.server.get_type(value_type)
+                            type = RedisAsyncServer.get_type(value_type)
                             key_len=rdbfile.read(1)[0]
                             key=rdbfile.read(key_len).decode()
                             val_len=rdbfile.read(1)[0]
@@ -106,7 +106,7 @@ def initialize_data_store():
                         bytetype=data
                         for i in range(k_count):                            
                             value_type= bytetype[0]
-                            type = RedisAsyncServer.server.get_type(value_type)
+                            type = RedisAsyncServer.get_type(value_type)
                             # print("type = ",type)
                             key_len=rdbfile.read(1)[0]
                             # print("key_len=",key_len)
@@ -270,23 +270,23 @@ async def propagate_command():
         command_str=CommandDeque.popleft()
         # print(">>>PROPAGATING>>>>writer status ",command_str)
         cmd_encoded=command_str.encode()
-        for s_writer in RedisAsyncServer.server.ReplicaList.keys():             
+        for s_writer in RedisAsyncServer.ReplicaList.keys():             
             s_writer.write(cmd_encoded)
             await s_writer.drain()            
-            curr_offset=RedisAsyncServer.server.ReplicaList[s_writer][0]
+            curr_offset=RedisAsyncServer.ReplicaList[s_writer][0]
             # print("server side offset of replica =",curr_offset)
             # server side update of offset
-            RedisAsyncServer.server.ReplicaList[s_writer][0] = curr_offset+len(cmd_encoded)
-            # print("server side  new offset of replica =",RedisAsyncServer.server.ReplicaList[s_writer][0])
+            RedisAsyncServer.ReplicaList[s_writer][0] = curr_offset+len(cmd_encoded)
+            # print("server side  new offset of replica =",RedisAsyncServer.ReplicaList[s_writer][0])
             
-            RedisAsyncServer.server.ReplicaList[s_writer][1]=False
+            RedisAsyncServer.ReplicaList[s_writer][1]=False
             print("Updated offset and sync to false by master")
             # await asyncio.sleep(0.001)
 
 async def process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaited_replicas):
-    for s_writer in RedisAsyncServer.server.ReplicaList.keys():
+    for s_writer in RedisAsyncServer.ReplicaList.keys():
         if s_writer in replica_temp_list:
-            if RedisAsyncServer.server.ReplicaList[s_writer][1]:
+            if RedisAsyncServer.ReplicaList[s_writer][1]:
                 synced_replicas += 1
                 replica_temp_list.remove(s_writer)
     return synced_replicas,replica_temp_list
@@ -313,20 +313,20 @@ async def check_and_update_locks(modified_data):
 
 async def propagate_getack_command(replica_temp_list):
     cmd_encoded= b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n'
-    for s_writer in RedisAsyncServer.server.ReplicaList.keys():
+    for s_writer in RedisAsyncServer.ReplicaList.keys():
         if s_writer in replica_temp_list:                
             s_writer.write(cmd_encoded)
             await s_writer.drain()            
-            curr_offset=RedisAsyncServer.server.ReplicaList[s_writer][0]
+            curr_offset=RedisAsyncServer.ReplicaList[s_writer][0]
             # server side update of offset
-            RedisAsyncServer.server.ReplicaList[s_writer][0] = curr_offset+len(cmd_encoded)
-            RedisAsyncServer.server.ReplicaList[s_writer][1] = False
+            RedisAsyncServer.ReplicaList[s_writer][0] = curr_offset+len(cmd_encoded)
+            RedisAsyncServer.ReplicaList[s_writer][1] = False
         
     
 
             
 async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
-    replica_temp_list=list(RedisAsyncServer.server.ReplicaList.keys()) 
+    replica_temp_list=list(RedisAsyncServer.ReplicaList.keys()) 
     synced_replicas=0    
     while True:
         if CommandDeque:
@@ -450,26 +450,26 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
         elif data_list[0] == 'CONFIG':
             if data_list[1] == 'GET':
                 if data_list[2].lower() == 'dir':
-                    rdb_dir=RedisAsyncServer.server.rdb_dir
+                    rdb_dir=RedisAsyncServer.rdb_dir
                     if rdb_dir is not None:
                         response=f'*2\r\n$3\r\ndir\r\n${len(rdb_dir)}\r\n{rdb_dir}\r\n'
                     else:
-                        path=RedisAsyncServer.server.dir
+                        path=RedisAsyncServer.dir
                         response=f'*2\r\n$3\r\ndir\r\n${len(path)}\r\n{path}\r\n'
                 elif data_list[2].lower() == 'dbfilename':
-                    rdb_filename=RedisAsyncServer.server.rdb_filename
+                    rdb_filename=RedisAsyncServer.rdb_filename
                     response=f'*2\r\n$10\r\ndbfilename\r\n${len(rdb_filename)}\r\n{rdb_filename}\r\n'
                 elif data_list[2].lower() == 'appendonly':
-                    aof_status=RedisAsyncServer.server.appendonly
+                    aof_status=RedisAsyncServer.appendonly
                     response=f'*2\r\n$10\r\nappendonly\r\n${len(aof_status)}\r\n{aof_status}\r\n'
                 elif data_list[2].lower() == 'appenddirname':
-                    appenddir=RedisAsyncServer.server.appenddirname
+                    appenddir=RedisAsyncServer.appenddirname
                     response=f'*2\r\n$13\r\nappenddirname\r\n${len(appenddir)}\r\n{appenddir}\r\n'
                 elif data_list[2].lower() == 'appendfilename':
-                    appendfile=RedisAsyncServer.server.appendfilename
+                    appendfile=RedisAsyncServer.appendfilename
                     response=f'*2\r\n$14\r\nappendfilename\r\n${len(appendfile)}\r\n{appendfile}\r\n'
                 elif data_list[2].lower() == 'appendfsync':
-                    append_sync=RedisAsyncServer.server.appendfsync
+                    append_sync=RedisAsyncServer.appendfsync
                     response=f'*2\r\n$11\r\nappendfsync\r\n${len(append_sync)}\r\n{append_sync}\r\n'
         elif data_list[0] == 'SET':
             print("Inside SET , query_string",query_string)
@@ -487,9 +487,9 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             modified_key=[key,client_addr]
             print(f'{server_role} set the new value !!!!')
             if server_role == 'master' :
-                if RedisAsyncServer.server.appendfsync == 'always':
-                    aof_dir=os.path.join(RedisAsyncServer.server.dir,RedisAsyncServer.server.appenddirname)                    
-                    manifest_file=RedisAsyncServer.server.appendfilename+'.manifest'        
+                if RedisAsyncServer.appendfsync == 'always':
+                    aof_dir=os.path.join(RedisAsyncServer.dir,RedisAsyncServer.appenddirname)                    
+                    manifest_file=RedisAsyncServer.appendfilename+'.manifest'        
                     manifest_file_path=os.path.join(aof_dir,manifest_file)
                     data_str=None
                     with open(manifest_file_path,'r') as mf:
@@ -1254,9 +1254,9 @@ async def client_handler(reader,writer):
                     role=RedisAsyncServer.role                    
                     length=5+len(role)                    
                     if role == 'master' :
-                        sec2='master_replid:'+RedisAsyncServer.server.master_replid
+                        sec2='master_replid:'+RedisAsyncServer.master_replid
                         print('sec2 =',sec2)
-                        sec3='master_repl_offset:'+str(RedisAsyncServer.server.master_repl_offset)
+                        sec3='master_repl_offset:'+str(RedisAsyncServer.master_repl_offset)
                         print('sec3 =',sec3)
                         master_resp=f'role:{role}\r\n{sec2}\r\n{sec3}\r\n'
                         response = f'${len(master_resp)}\r\n' + master_resp + f'\r\n'
@@ -1272,11 +1272,18 @@ async def client_handler(reader,writer):
                     writer.write(response)
                     await writer.drain() 
                     continue 
-                key=input_tokens[4]
+                no_of_watched_keys=int(input_tokens[0].lstrip('*'))-1
+                watched_keys=[]
+                i=4
+                while i < no_of_watched_keys:
+                    watched_keys.append(input_tokens[i])
+                    i=i+2
+
                 #locks keep track of key and if modified or not state
                 #state will be set as true if any other client modifies this key after this
-                keystatelst=[key,False]
-                transaction_lock.locks[client_addr].append(keystatelst)
+                for watched_k in watched_keys:
+                    keystatelst=[watched_k,False]
+                    transaction_lock.locks[client_addr].append(keystatelst)
                 response=b'+OK\r\n'
                 writer.write(response)
                 await writer.drain() 
@@ -1359,12 +1366,12 @@ async def client_handler(reader,writer):
                     continue  
             if 'REPLCONF' in input_tokens and 'ACK' in input_tokens and RedisAsyncServer.role == 'master':
                 replica_offset = int(input_tokens[6]) + len(b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n')                
-                offset_by_master=RedisAsyncServer.server.ReplicaList[writer][0] 
+                offset_by_master=RedisAsyncServer.ReplicaList[writer][0] 
                 # print("offset by replica =",replica_offset)
                 # print("offset by master =",offset_by_master)
                 if replica_offset == offset_by_master:
                     print("!!! one replica offset matched !!!!")
-                    RedisAsyncServer.server.ReplicaList[writer][1] =True
+                    RedisAsyncServer.ReplicaList[writer][1] =True
                 continue 
             elif 'REPLCONF'  in input_tokens:
                 if RedisAsyncServer.role == 'master':
@@ -1374,7 +1381,7 @@ async def client_handler(reader,writer):
                     continue 
             if 'PSYNC' in input_tokens:
                 if RedisAsyncServer.role == 'master':
-                    response=f'+FULLRESYNC {RedisAsyncServer.server.master_replid} 0\r\n'
+                    response=f'+FULLRESYNC {RedisAsyncServer.master_replid} 0\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
                     rdb_hex='524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2'
@@ -1386,7 +1393,7 @@ async def client_handler(reader,writer):
                     await writer.drain()
                     #adding replica and its command offset
                     
-                    RedisAsyncServer.server.ReplicaList[writer]=[0,True]                    
+                    RedisAsyncServer.ReplicaList[writer]=[0,True]                    
                     print("$$$$$$ server ADDED to ReplicaList and set offet to 0$$$$$")
                     continue             
             # if 'WAIT' in input_tokens or 'wait' in input_tokens:
@@ -1410,7 +1417,7 @@ async def client_handler(reader,writer):
                     CommandDeque.append(new_cmd_str)
                     await propagate_command()
                     query_string=''
-                    # await RedisAsyncServer.server.save()                    
+                    # await RedisAsyncServer.save()                    
             if not response == 'REPLCONF ACK':
                 print("response from client handler")
                 print("for command :",input_tokens)
@@ -1479,7 +1486,7 @@ async def command_propagation_handler():
                     print('offset send to master for getack')
                     command_len=len(command)
                     command_offset=command_offset + command_len
-                    RedisAsyncServer.server.replica_command_offset = command_offset
+                    RedisAsyncServer.replica_command_offset = command_offset
                     print("slave adding getack offset",command_offset)
                     command_len=0
                     continue     
@@ -1532,17 +1539,17 @@ async def command_propagation_handler():
                         print("SET string",command_string)
                         print("SET offset",command_len)
                         command_offset=command_offset+command_len
-                        RedisAsyncServer.server.replica_command_offset = command_offset
+                        RedisAsyncServer.replica_command_offset = command_offset
                         print("slave adding SET offset",command_offset)
                         command_len=0
                         print(f'slave set the new value !!!!',RedisAsyncServer.data_store[key].data)
                     elif data_list[0].upper() == 'REPLCONF' and data_list[1].upper() == 'GETACK': 
-                        response=f'*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n${len(str(RedisAsyncServer.server.replica_command_offset))}\r\n{str(RedisAsyncServer.server.replica_command_offset)}\r\n'  
+                        response=f'*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n${len(str(RedisAsyncServer.replica_command_offset))}\r\n{str(RedisAsyncServer.replica_command_offset)}\r\n'  
                         m_writer.write(response.encode())  
                         await m_writer.drain() 
                         command_len=len(b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n')
                         command_offset=command_offset + command_len
-                        RedisAsyncServer.server.replica_command_offset = command_offset
+                        RedisAsyncServer.replica_command_offset = command_offset
                         print("slave adding offset getack",command_offset)
                         command_len=0
                         continue     
@@ -1552,7 +1559,7 @@ async def command_propagation_handler():
                         # await m_writer.drain() 
                         command_len=14
                         command_offset=command_offset + command_len
-                        RedisAsyncServer.server.replica_command_offset = command_offset
+                        RedisAsyncServer.replica_command_offset = command_offset
                         print("slave adding PING offset",command_offset)
                         command_len=0
                         continue     
@@ -1649,6 +1656,10 @@ def main():
     master_details=''
     port_number=6379
     args=sys.argv
+    if '--replicaof' in sys.argv:
+        RedisAsyncServer=Replica()
+    else:
+        RedisAsyncServer=Master()
     if '--port' in sys.argv:
         try:            
             port_number=int(args[args.index('--port')+1])
@@ -1659,8 +1670,7 @@ def main():
     RedisAsyncServer.clients.append(User())
     if '--replicaof' in sys.argv:
         try:
-            RedisAsyncServer.role='slave'
-            RedisAsyncServer.server=Replica()            
+            # RedisAsyncServer.role='slave'                     
             master_details=args[args.index('--replicaof')+1].split(' ')
             master_host = master_details[0].strip()
             master_port = int(master_details[1].strip())
@@ -1672,32 +1682,32 @@ def main():
     #--dir /tmp/redis-files --dbfilename dump.rdb
     if '--dir' in sys.argv:        
         RDB_DIR=args[args.index('--dir')+1]
-        RedisAsyncServer.server.rdb_dir=RDB_DIR
-        RedisAsyncServer.server.dir=RDB_DIR
+        RedisAsyncServer.rdb_dir=RDB_DIR
+        RedisAsyncServer.dir=RDB_DIR
 
     if '--dbfilename' in sys.argv:        
         RDB_FILENAME=args[args.index('--dbfilename')+1]
-        RedisAsyncServer.server.rdb_filename=RDB_FILENAME
+        RedisAsyncServer.rdb_filename=RDB_FILENAME
         
     if '--appendonly' in sys.argv:        
         aof_val=args[args.index('--appendonly')+1]
-        RedisAsyncServer.server.appendonly=aof_val
+        RedisAsyncServer.appendonly=aof_val
     if '--appenddirname' in sys.argv:        
         appenddirname=args[args.index('--appenddirname')+1]
-        RedisAsyncServer.server.appenddirname=appenddirname
+        RedisAsyncServer.appenddirname=appenddirname
     if '--appendfilename' in sys.argv:        
         AOFFILENAME=args[args.index('--appendfilename')+1]
-        RedisAsyncServer.server.appendfilename=AOFFILENAME
+        RedisAsyncServer.appendfilename=AOFFILENAME
     if '--appendfsync' in sys.argv:        
         aofsyncstat=args[args.index('--appendfsync')+1]
-        RedisAsyncServer.server.appendfsync=aofsyncstat
+        RedisAsyncServer.appendfsync=aofsyncstat
 
     if RedisAsyncServer.role=='master':
-        if RedisAsyncServer.server.appendonly == 'yes' :
-            aof_dir=os.path.join(RedisAsyncServer.server.dir,RedisAsyncServer.server.appenddirname)
+        if RedisAsyncServer.appendonly == 'yes' :
+            aof_dir=os.path.join(RedisAsyncServer.dir,RedisAsyncServer.appenddirname)
             os.makedirs(aof_dir, exist_ok=True)
-            new_aof_file=RedisAsyncServer.server.appendfilename+'.1.incr.aof' 
-            manifest_file=RedisAsyncServer.server.appendfilename+'.manifest'
+            new_aof_file=RedisAsyncServer.appendfilename+'.1.incr.aof' 
+            manifest_file=RedisAsyncServer.appendfilename+'.manifest'
             aof_filepath=os.path.join(aof_dir,new_aof_file)
             with open(aof_filepath,'a') as f:
                 print(f'AOF file check by master......')
@@ -1710,17 +1720,17 @@ def main():
                 # data_str=f'file {new_aof_file} seq 1 type i'
                 # print("Manifest file created and data written = ",mf.write(data_str))
             
-        RedisAsyncServer.server.master_replid = '8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb'
-        RedisAsyncServer.server.master_repl_offset = 0
-        if RedisAsyncServer.server.rdb_dir and RedisAsyncServer.server.rdb_filename:
+        RedisAsyncServer.master_replid = '8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb'
+        RedisAsyncServer.master_repl_offset = 0
+        if RedisAsyncServer.rdb_dir and RedisAsyncServer.rdb_filename:
             initialize_data_store()
     if RedisAsyncServer.role == 'master':
-        if RedisAsyncServer.server.appendonly == 'yes':
+        if RedisAsyncServer.appendonly == 'yes':
             print(">>>>>>>>AOF FILE REPLAY<<<<<<<<")
-            aof_path=os.path.join(RedisAsyncServer.server.dir,RedisAsyncServer.server.appenddirname)
+            aof_path=os.path.join(RedisAsyncServer.dir,RedisAsyncServer.appenddirname)
             print('aof_path =',aof_path)
             if os.path.exists(aof_path) :
-                manifest_file=os.path.join(aof_path,RedisAsyncServer.server.appendfilename+'.manifest')
+                manifest_file=os.path.join(aof_path,RedisAsyncServer.appendfilename+'.manifest')
                 print("manifest_file = ",manifest_file)
                 if os.path.exists(manifest_file):
                     print("Opening manifest file")
