@@ -1,8 +1,4 @@
-def is_member(userobjs,user):
-    users_list=[obj.username for obj in userobjs]
-    if user in users_list:
-        return True
-    return False
+##########CLIENTS/USERS##########################
 
 def add_client(username,userobjs,client_address):
     for obj in userobjs:
@@ -33,7 +29,8 @@ def allow_commands(userobjs,client_address):
                 return False
     return True        
 
-                
+
+###################STREAMS################################                
 def get_last_stream_key(millisecondstime,stream_obj_list):   
     last_sn=-1
     for obj in stream_obj_list:
@@ -119,5 +116,61 @@ def get_xrange_response(redis_obj,start,end):
     return result_str   
 
 
-    
+async def valid_stream_key(stream_key,last_key):
+    #<millisecondsTime>-<sequenceNumber>
+    message =''
+    stream_key_parts = str(stream_key).split('-')
+    stream_key_millisecondsTime = int(stream_key_parts[0].strip())    
+    last_key_parts = str(last_key).split('-')
+    last_key_millisecondsTime = int(last_key_parts[0].strip())
+    last_key_sequenceNumber = int(last_key_parts[1].strip())
+    stream_key_sequenceNumber = int(stream_key_parts[1].strip())
+    if stream_key_millisecondsTime == 0 and stream_key_sequenceNumber == 0:
+        message =f'-ERR The ID specified in XADD must be greater than 0-0\r\n'
+    elif last_key_millisecondsTime == stream_key_millisecondsTime :
+        if stream_key_sequenceNumber > last_key_sequenceNumber:
+            return True,message
+        else:
+            message=f'-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n'
+    elif stream_key_millisecondsTime >last_key_millisecondsTime:
+        return True,message
+    else:
+        message=f'-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n'
+    return False,message
+   
+
+async def get_new_stream_key(stream_key_part1,redis_obj):
+    stream_key_millisecondsTime =int(stream_key_part1)
+    if not redis_obj.data or not redis_obj.last_key:
+        if stream_key_millisecondsTime == 0:
+            stream_key = '0-1' 
+        else:
+            stream_key=stream_key_part1 + '-1'
+        
+    else:
+        stream_key = get_next_stream_key(stream_key_millisecondsTime,redis_obj.data)       
+    print(">>>New stream key: ",stream_key)
+    return stream_key
+
+def get_xread_response(key,redis_obj,start):
+    #XREAD 
+    result=[]
+    for stream_obj in redis_obj.data:
+        l=0
+        if stream_obj.id > start:
+                l=len(stream_obj.entry)
+                result.append((l,stream_obj))  
+        
+    n1 = len(result)
+    print("xread result length =",n1)   
+
+    result_str=f'*2\r\n${len(key)}\r\n{key}\r\n*{n1}\r\n'  
+    for length,obj in result:
+        #appending each entry object of the stream and number of key-value pairs
+        result_str=result_str+f'*2\r\n${len(obj.id)}\r\n{obj.id}\r\n*{length*2}\r\n' 
+        for k,v in obj.entry.items():
+            # appending key-value pairs of the stream entry
+            result_str=result_str+f'${len(k)}\r\n{k}\r\n${len(v)}\r\n{v}\r\n'
+    print("RESULT = ",result_str)
+    return result_str,n1
 

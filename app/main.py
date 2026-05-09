@@ -3,11 +3,11 @@ from datetime import timezone,timedelta,datetime
 import time
 from collections import deque,defaultdict
 import os
-import shutil
-from . import geo_encode,distance,hashing,utilities
-from . import distance
-from .data_models import User,RedisServer,Replica,Master,StreamEntry,RedisObject,Transaction
-from .utilities import get_last_stream_key, get_next_stream_key, get_xrange_response
+from . import geo_encode,hashing,utilities
+from .data_models import User,Replica,Master,StreamEntry,RedisObject,Transaction
+from .utilities import get_xrange_response,valid_stream_key,get_new_stream_key,get_xread_response
+from . import get_commands
+from . import datastore
 
 #globals
 RedisAsyncServer=None
@@ -17,118 +17,6 @@ xread_stream_block_que=defaultdict(list)
 transaction_lock=Transaction()
 
     
-#initialize datastore from RDB snapshot instance
-def initialize_data_store():
-    try:
-        global RedisAsyncServer
-        rdb_dir=RedisAsyncServer.rdb_dir
-        rdb_filename=RedisAsyncServer.rdb_filename
-        os.makedirs(rdb_dir, exist_ok=True)
-        filepath=os.path.join(rdb_dir,rdb_filename)
-        basedir="C:\\Users\\Ardra\\codecrafters-redis-python"
-        os.makedirs(basedir, exist_ok=True)  
-        tempfilepath=os.path.join(basedir,rdb_filename)  
-            
-        with open(tempfilepath,'wb') as dst,open(filepath,'rb') as src:
-            shutil.copyfileobj(src, dst) 
-        # b'REDIS0011\xfa\tredis-ver\x057.2.0\xfa\nredis-bits\xc0@\xfe\x00\xfb\x01\x00\x00\x05mango\x06orange\xff\xeb)\xe1\xcfp\x08\x1f\x9a'
-        with open(tempfilepath,'rb') as rdbfile:
-            print(rdbfile.read(1024))
-        # tempfilepath='./app/temp.rdb'
-        # with open(tempfilepath,'wb') as rdbfile:
-        #     rdbfile.write(b'REDIS0011\xfa\tredis-ver\x057.2.0\xfa\nredis-bits\xc0@\xfe\x00\xfb\x04\x00\x00\x05grape\x06orange\x00\traspberry\tpineapple\x00\x06orange\x05mango\x00\tblueberry\x06banana\xffue\xb86\xd9\x03\xaa8')
-        with open(tempfilepath,'rb') as rdbfile: 
-            chunk = rdbfile.read(5)  
-            if chunk == b'REDIS' :
-                print("Reading rdb file, REDIS found !!")  
-            key_count=0
-            expiring_key_count=0
-            while i := rdbfile.read(1):
-                if i==b'\xfe':
-                    print("New db found !!")  
-                    while i := rdbfile.read(1):
-                        if i==b'\xfb':
-                            key_count=rdbfile.read(1)[0]
-                            print("Key count= ",key_count)  
-                            expiring_key_count=rdbfile.read(1)[0]
-                            break
-                    break 
-            if key_count: 
-                k_count= key_count-expiring_key_count  
-                while data := rdbfile.read(1):
-                    # create=False
-                    
-                    if data == b'\xff':
-                        break
-                    if expiring_key_count:
-                        if data == b'\xfd':
-                            print(">>>>Expire timestamp in seconds key-value found")
-                            
-                            #Expire timestamp in seconds (4-byte unsigned integer)
-                            expires_on_sec = int.from_bytes(rdbfile.read(4), byteorder='little', signed=False)
-                            expiry = datetime.fromtimestamp(expires_on_sec,tz=timezone.utc)
-                            # expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_on_sec)                
-                            value_type= rdbfile.read(1)[0]
-                            type = RedisAsyncServer.get_type(value_type)
-                            key_len=rdbfile.read(1)[0]
-                            key=rdbfile.read(key_len).decode()
-                            val_len=rdbfile.read(1)[0]
-                            val=rdbfile.read(val_len).decode()
-                            if datetime.now(timezone.utc) < expiry :
-                                RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
-                                print('=======saved========') 
-                                print(f'type({type}) --->{key} : {val} expires on {expiry}') 
-                            expiring_key_count -=1              
-                            
-                            
-                        elif data == b'\xfc' :
-                            print(">>>Expire timestamp in milliseconds key-value found")
-                            #Expire timestamp in milliseconds (8-byte unsigned long)
-                            expires_on_msec = int.from_bytes(rdbfile.read(8), byteorder='little', signed=False)
-                            expiry = datetime.fromtimestamp(expires_on_msec / 1000,tz=timezone.utc)
-                            # expiry = datetime.now(timezone.utc) + timedelta(milliseconds=expires_on_sec)
-                            value_type= rdbfile.read(1)[0]
-                            type = RedisAsyncServer.get_type(value_type)
-                            key_len=rdbfile.read(1)[0]
-                            key=rdbfile.read(key_len).decode()
-                            val_len=rdbfile.read(1)[0]
-                            val=rdbfile.read(val_len).decode()
-                            if datetime.now(timezone.utc) < expiry :
-                                RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
-                                print('=======saved========') 
-                                print(f'type({type}) --->{key} : {val} expires on {expiry}') 
-                            expiring_key_count -=1
-                        
-                    else :
-                        print(">>>>non expiriny key-value found")
-                        
-                        # data without expiry
-                        expiry=None
-                        bytetype=data
-                        for i in range(k_count):                            
-                            value_type= bytetype[0]
-                            type = RedisAsyncServer.get_type(value_type)
-                            # print("type = ",type)
-                            key_len=rdbfile.read(1)[0]
-                            # print("key_len=",key_len)
-                            key=rdbfile.read(key_len).decode()
-                            # print("key= ",key)
-                            val_len=rdbfile.read(1)[0]
-                            # print("val_len= ",val_len)
-                            val=rdbfile.read(val_len).decode()
-                            # print("val= ",val)                     
-                            RedisAsyncServer.data_store[key] = RedisObject(data = val,exp=expiry,data_type=type) 
-                            print('=======saved========') 
-                            print(f'type({type}) --->{key} : {val}') 
-                            bytetype=rdbfile.read(1)
-                        data = bytetype 
-                    if data == b'\xff':
-                        break
-                                        
-    except Exception as e:
-        print("Exception during rdb file save :: ",e)   
-
-
 
 async def blocked_client_handler():
     global RedisAsyncServer
@@ -177,70 +65,9 @@ async def get_blpop_response(client_tuple) :
             return response  
 
 
-
-
 def get_milliseconds_time():
-    return int(time.time() * 1000)
+    return int(time.time() * 1000)  
 
-
-async def valid_stream_key(stream_key,last_key):
-    #<millisecondsTime>-<sequenceNumber>
-    message =''
-    stream_key_parts = str(stream_key).split('-')
-    stream_key_millisecondsTime = int(stream_key_parts[0].strip())    
-    last_key_parts = str(last_key).split('-')
-    last_key_millisecondsTime = int(last_key_parts[0].strip())
-    last_key_sequenceNumber = int(last_key_parts[1].strip())
-    stream_key_sequenceNumber = int(stream_key_parts[1].strip())
-    if stream_key_millisecondsTime == 0 and stream_key_sequenceNumber == 0:
-        message =f'-ERR The ID specified in XADD must be greater than 0-0\r\n'
-    elif last_key_millisecondsTime == stream_key_millisecondsTime :
-        if stream_key_sequenceNumber > last_key_sequenceNumber:
-            return True,message
-        else:
-            message=f'-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n'
-    elif stream_key_millisecondsTime >last_key_millisecondsTime:
-        return True,message
-    else:
-        message=f'-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n'
-    return False,message
-
-
-async def get_new_stream_key(stream_key_part1,redis_obj):
-    stream_key_millisecondsTime =int(stream_key_part1)
-    if not redis_obj.data or not redis_obj.last_key:
-        if stream_key_millisecondsTime == 0:
-            stream_key = '0-1' 
-        else:
-            stream_key=stream_key_part1 + '-1'
-        
-    else:
-        stream_key = get_next_stream_key(stream_key_millisecondsTime,redis_obj.data)       
-    print(">>>New stream key: ",stream_key)
-    return stream_key
-    
-
-def get_xread_response(key,redis_obj,start):
-    #XREAD 
-    result=[]
-    for stream_obj in redis_obj.data:
-        l=0
-        if stream_obj.id > start:
-                l=len(stream_obj.entry)
-                result.append((l,stream_obj))  
-        
-    n1 = len(result)
-    print("xread result length =",n1)   
-
-    result_str=f'*2\r\n${len(key)}\r\n{key}\r\n*{n1}\r\n'  
-    for length,obj in result:
-        #appending each entry object of the stream and number of key-value pairs
-        result_str=result_str+f'*2\r\n${len(obj.id)}\r\n{obj.id}\r\n*{length*2}\r\n' 
-        for k,v in obj.entry.items():
-            # appending key-value pairs of the stream entry
-            result_str=result_str+f'${len(k)}\r\n{k}\r\n${len(v)}\r\n{v}\r\n'
-    print("RESULT = ",result_str)
-    return result_str,n1
         
 
 async def get_data_type(val):
@@ -312,8 +139,7 @@ def check_and_update_locks(modified_data):
                         print('======================LOCK UPDATE===================================')
                         print(f'{this_client} client modified key {key} locked by client {c_adrs}')
                         break
-                i=i+1    
-            
+                i=i+1            
 
 
 
@@ -342,8 +168,7 @@ async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
         else:
             break
     SENDACK=True    
-    while datetime.now(timezone.utc) < timeout:
-        
+    while datetime.now(timezone.utc) < timeout:        
         synced_replicas,replica_temp_list=await process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaited_replicas)
            
         if synced_replicas>=no_of_awaited_replicas:
@@ -356,27 +181,11 @@ async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
             await propagate_getack_command(replica_temp_list)
             SENDACK=False
         await asyncio.sleep(0.001)
-    return synced_replicas    
-
-    
-    # while synced_replicas < no_of_awaited_replicas : 
-    #     while datetime.now(timezone.utc) < timeout:
-    #         synced_replicas,replica_temp_list=await process_synced_replicas(synced_replicas,replica_temp_list,no_of_awaited_replicas)
-    #         # print("synced_replicas : ",synced_replicas)
-    #         if synced_replicas==no_of_awaited_replicas:
-    #             print("synced_replicas : ",synced_replicas)
-    #             return no_of_awaited_replicas
-    #         else:
-    #             await asyncio.sleep(0.001)  
-    # print("synced_replicas :timeout ",synced_replicas)       
-    # return synced_replicas
- 
-
-                    
+    return synced_replicas               
                     
      
     
-from . import geo_decode
+
 async def command_handler(writer,client_addr,server_role,query_string,input_tokens):
     global RedisAsyncServer
     input_tokens=query_string.splitlines()
@@ -388,8 +197,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
     if no_of_elements == 1:
         if input_tokens[2] == 'PING':
             response=f"+PONG\r\n"
-            # writer.write(response)
-            # await writer.drain()  
+             
             
     elif no_of_elements > 1:
         for token in input_tokens:
@@ -568,10 +376,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     
             else:
                 response=f"$-1\r\n"
-            # writer.write(response.encode())
-            # await writer.drain()
-            # print('###RESPONSE###')
-            # print(response) 
+            
         elif data_list[0] == 'LPUSH': 
             key=data_list[1] 
             new_data_list=data_list[2:]
@@ -585,9 +390,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 modified_key=[key,client_addr]
             if redis_obj.blocked_clients and redis_obj.data:
                 pass                    
-            response=f':{n}\r\n'
-            # writer.write(response.encode())
-            # await writer.drain()                                                          
+            response=f':{n}\r\n'                                                                   
                 
         elif data_list[0] == 'RPUSH': 
             key=data_list[1] 
@@ -604,8 +407,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             if redis_obj.blocked_clients and redis_obj.data:
                 pass
             response=f':{n}\r\n'
-            # writer.write(response.encode())
-            # await writer.drain()                    
+                              
         elif data_list[0] == 'LRANGE': 
             key=data_list[1] 
             start_index=int(data_list[2].strip())
@@ -639,10 +441,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 length=len(result_list)
                 response=f'*{length}\r\n'+'\r\n'.join(f'${len(item)}\r\n{item}' for item in result_list)+f'\r\n'
             
-            # print('>>>RESPONSE>>>>') 
-            # print(response)                    
-            # writer.write(response.encode())
-            # await writer.drain()
+            
         elif data_list[0] == 'LLEN': 
             key=data_list[1] 
             length=0
@@ -652,10 +451,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 response=f':{length}\r\n'                    
             else:
                 response=f':0\r\n'
-            # print('###RESPONSE###')
-            # print(response)
-            # writer.write(response.encode())
-            # await writer.drain()
+            
         elif data_list[0] == 'BLPOP': 
             key=data_list[1] 
             waits_for=float(data_list[2]) # in seconds, 0 for infinite
@@ -669,8 +465,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     response=f'*2\r\n${len(key)}\r\n{key}\r\n${length}\r\n{ele}\r\n' 
                     print('###RESPONSE TO BLPOP CLIENT###')
                     print(response)
-                    # writer.write(response.encode())
-                    # await writer.drain() 
+                    
                 else:
                     # if data is not available add to blocked clients
                     if waits_for == 0:
@@ -694,15 +489,11 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                     client_tuple=tuple((writer,expires_on,key))
                     redis_obj.blocked_clients.append(client_tuple)  
                     response = await get_blpop_response(client_tuple)
-                    # response=f'$-1\r\n'
-                    # print('###RESPONSE###')
-                    # print(response)
+                    
             if not writer.is_closing():
                 print('###RESPONSE###')
                 print(response)
-                # writer.write(response.encode())
-                # await writer.drain()
-                # print("send response>>>>>>>>>>>>>>")
+                
         elif data_list[0] == 'LPOP': 
             key=data_list[1] 
             length=0
@@ -720,23 +511,16 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                         if pop_count > len(redis_obj.data):
                             pop_count=len(redis_obj.data)
                         popped_elements=[]
+                        #Popping {pop_count} elements
                         for i in range(pop_count):
                             popped_elements.append(redis_obj.data.pop(0))
-                        length=len(popped_elements)
-                        print(f'>>>Popping {pop_count} elements<<<')
-                        print(popped_elements)
-                        print(">>>remaining elements<<<<<")
-                        print(redis_obj.data)
-                        response=f'*{length}\r\n'+''.join([f'${len(ele)}\r\n{ele}\r\n' for ele in popped_elements])
-                                                            
+                        length=len(popped_elements)                        
+                        response=f'*{length}\r\n'+''.join([f'${len(ele)}\r\n{ele}\r\n' for ele in popped_elements])                                                            
             if length == 0:
                 response=f'$-1\r\n'
             else:
                 modified_key=[key,client_addr]
-            # print('###RESPONSE###')
-            # print(response)
-            # writer.write(response.encode())
-            # await writer.drain()
+            
         elif data_list[0] == 'XADD': 
             key=data_list[1]
             stream_key = data_list[2]
@@ -902,92 +686,21 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 response=':1\r\n' 
         elif data_list[0].lower() == 'zrank':
             # ZRANK zset_key member
-            print('data_list =', data_list)
-            key=data_list[1]
-            member = data_list[2] 
-            if key not in RedisAsyncServer.data_store :
-                response = '$-1\r\n' 
-            else:
-                memberExists = False
-                old_data = RedisAsyncServer.data_store[key].data
-                for l in old_data:
-                    if l[1] == member :
-                        index=old_data.index(l)                                             
-                        response=f':{index}\r\n' 
-                        memberExists = True                      
-                        break
-                if not memberExists:
-                    response = '$-1\r\n'
+            response=get_commands.get_zrank(data_list,RedisAsyncServer.data_store)           
+            
         elif data_list[0].lower() == 'zrange' :
             # ZRANGE racer_scores 0 2
-            key=data_list[1]
-            start_inx=int(data_list[2])
-            end_inx=int(data_list[3])
-            print(f"zrange[{key}] : [{start_inx} : {end_inx}]")
-            slice = True
-            if key not in RedisAsyncServer.data_store :
-                response = '*0\r\n' 
-                slice = False
-            else:
-                scores=RedisAsyncServer.data_store[key].data
-                total_len=len(scores)
-                # If the start index is greater than or equal to the cardinality of the sorted set, an empty array is returned.
-                #If the start index is greater than the stop index, the result is an empty array
-                if start_inx >= total_len :
-                    response = '*0\r\n' 
-                    slice = False
-                if  end_inx >= 0 and start_inx > end_inx :
-                    response = '*0\r\n' 
-                    slice = False
-                if slice:
-                    # If the stop index is greater than the cardinality of the sorted set, the stop index is treated as the last element.
-                    if end_inx > total_len :
-                        end_inx = total_len-1
-                    if end_inx < 0:
-                        if abs(end_inx) >= total_len :
-                            end_inx = 0
-                        else:
-                            end_inx = total_len + end_inx
-                    if start_inx < 0:
-                        if abs(start_inx) >= total_len :
-                            start_inx = 0
-                        else: 
-                            start_inx = start_inx +total_len
-                    
-                    print("zrange slicing = ",start_inx,end_inx+1)
-                    sliced_set= scores[start_inx : end_inx+1]
-                    print("zrange sliced_set = ",sliced_set)
-                    response=f'*{len(sliced_set)}\r\n'
-                    response=response+''.join(f'${len(l[1])}\r\n{l[1]}\r\n' for l in sliced_set)
+            response=get_commands.get_zrange(data_list,RedisAsyncServer.data_store)
+            
             print("zrange response = ",response)
         elif data_list[0].lower() == 'zcard' :
             # ZCARD zset_key
-            key = data_list[1]
-            
-            if key not in RedisAsyncServer.data_store :
-                response = ":0\r\n" 
-                
-            else:
-                scores=RedisAsyncServer.data_store[key].data
-                total_len=len(scores)
-                response = f":{total_len}\r\n" 
+            response=get_commands.get_zcard(data_list,RedisAsyncServer.data_store)
+             
         elif data_list[0].lower() == 'zscore' :
             # ZSCORE zset_key member
-            key = data_list[1]
-            member=data_list[2]
-            if key not in RedisAsyncServer.data_store :
-                response = "$-1\r\n" 
-            else:
-                is_member = False
-                old_data = RedisAsyncServer.data_store[key].data
-                for l in old_data:
-                    if l[1] == member : 
-                        scr_str=str(l[0])                                                                    
-                        response=f'${len(scr_str)}\r\n{scr_str}\r\n' 
-                        is_member = True                      
-                        break
-                if not is_member:
-                    response = '$-1\r\n'
+            response = get_commands.get_zscore(data_list,RedisAsyncServer.data_store)
+            
             print("zscore response = ",response)
         elif data_list[0].lower() == 'zrem' :
             # ZREM zset_key member
@@ -1018,10 +731,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
             if longitude < -180 or longitude > 180 or latitude < -85.05112878 or latitude > 85.05112878 :
                 response=f'-ERR invalid longitude,latitude pair {longitude},{latitude}\r\n'
             else:
-                # if not key in RedisAsyncServer.data_store :
-                #     RedisAsyncServer.data_store[key] = RedisObject(data=[],data_type='geospatial')
-                # RedisAsyncServer.data_store[key].data.append((longitude,latitude,placename))  
-                # response = ':1\r\n'  
+                
                 geoscore= geo_encode.encode(latitude=latitude,longitude=longitude)
                 score_list=list((geoscore,placename))            
                 if key not in RedisAsyncServer.data_store:
@@ -1054,87 +764,16 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
 
         elif data_list[0].upper() == 'GEOPOS' :
             # GEOPOS key member1 member2
-            key=data_list[1]
-            members=data_list[2:]
-            m_len=len(members)
-            response=f'*{m_len}\r\n'
-            if key in RedisAsyncServer.data_store :                
-                geopos=RedisAsyncServer.data_store[key].data                
-                for query_member in members:
-                    is_member=False
-                    for score,member in geopos:
-                        if member == query_member:
-                            latitude,longitude=geo_decode.decode(int(score))
-                            la=str(latitude)
-                            lo=str(longitude)
-                            response=response + f'*2\r\n${len(lo)}\r\n{lo}\r\n${len(la)}\r\n{la}\r\n'
-                            is_member=True
-                            break
-                    if not is_member:
-                        response=response + '*-1\r\n'
-            else:
-                response=response + ''.join('*-1\r\n' for _ in range(m_len))           
+            response = get_commands.geo_position(data_list,RedisAsyncServer.data_store)
+                       
 
         elif data_list[0].upper() == 'GEODIST' :
             # GEODIST places Munich Paris  , 
+            response = get_commands.geo_dist(data_list,RedisAsyncServer.data_store)            
             
-            key=data_list[1]
-            locations=data_list[2:]            
-            if key in RedisAsyncServer.data_store :                
-                geopos=RedisAsyncServer.data_store[key].data 
-                latitude1 = None
-                longitude1= None
-                latitude2= None
-                longitude2 = None
-                for score,location in geopos:
-                    if location in locations:
-                        if locations[0] == locations[1]:
-                            response=f'$1\r\n0\r\n'
-                            break
-                        if location == locations[0]:
-                            latitude1,longitude1=geo_decode.decode(int(score))
-                        elif location == locations[1]:
-                            latitude2,longitude2=geo_decode.decode(int(score))
-                    
-                    if  latitude1 and longitude1 and latitude2 and longitude2 :
-                        print(latitude1, longitude1,' :::: ',latitude2,longitude2)
-                        dist=  distance.haversine(latitude1, longitude1, latitude2, longitude2)  
-                        response=f'${len(str(dist))}\r\n{str(dist)}\r\n'
-                        break               
-                
-            else:
-                response = '$-1\r\n'
         elif data_list[0].upper() == 'GEOSEARCH' :
-            # GEOSEARCH key FROMLONLAT longitude latitude BYRADIUS radius unit(m)            
-            key=data_list[1]
-            locations=[]
-            if key in RedisAsyncServer.data_store :                
-                geopos=RedisAsyncServer.data_store[key].data 
-                center_long = float(data_list[3])
-                center_lat= float(data_list[4])
-                radius=float(data_list[6])
-                print("Radius = ",radius)
-                unit=data_list[7]
-                conv=1
-                if unit == 'km':
-                    conv=0.001
-                elif unit == 'mi' :
-                    conv =0.00062137
-
-                for score,place in geopos:
-                    lat,long=geo_decode.decode(int(score))
-                    dist=  distance.haversine( lat, long,center_lat, center_long)
-                    print(f">>>>>>distance for place {place} = {dist}")
-                    if (dist * conv) <= radius :
-                        locations.append(place)
-                if locations :
-                    response=f'*{len(locations)}\r\n'+''.join(f'${len(l)}\r\n{l}\r\n' for l in locations)
-                else:
-                    response=f'*0\r\n'
-
-            else:
-                response=f'*0\r\n'
-            print("response = ",response)
+            # GEOSEARCH key FROMLONLAT longitude latitude BYRADIUS radius unit(m) 
+            response =  get_commands.geo_search(data_list,RedisAsyncServer.data_store)           
 
         elif data_list[0].upper() == 'ACL':
             current_users=RedisAsyncServer.clients
@@ -1177,7 +816,6 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                         response='+OK\r\n'
                         if not utilities.client_exists(RedisAsyncServer.clients,client_addr):
                             RedisAsyncServer.clients=utilities.add_client(user_name,RedisAsyncServer.clients,client_addr)
-
                         break                    
 
         elif data_list[0] == 'TYPE': 
@@ -1187,8 +825,7 @@ async def command_handler(writer,client_addr,server_role,query_string,input_toke
                 response=f'+{data_type}\r\n'
             else:
                 response=f'+none\r\n'
-            # writer.write(response.encode())
-            # await writer.drain() 
+            
     if modified_key:
         print("calling check and update lock")
         check_and_update_locks(modified_key) 
@@ -1215,27 +852,55 @@ async def client_handler(reader,writer):
         transaction_lock.locks[client_addr]=[]
         MULTI=[False,deque()]
         while CONNECT:
-            input_query=await reader.read(1024)
-            # if not utilities.allow_commands(userobjs,client_addr):
-            #     response='-NOAUTH Authentication required.\r\n'
-            #     writer.write(response.encode())
-            #     await writer.drain() 
-            #     continue 
-            # if not utilities.client_exists(users,client_addr):
-            #     new_user=User()
-            #     new_user.client_address = client_addr
-
-            if not input_query:
+            ########Reading and parsing commands#########
+            line1=await reader.readline()
+            print("line1=",line1)
+            if not line1 or not line1.startswith(b'*'):
                 await asyncio.sleep(0.2)
                 continue
-            query_string=str(input_query.decode()) 
+            cmd_length=int(line1.decode()[1:-2])
+            if cmd_length:
+                finished=True
+                query_string=f'{line1.decode()[:-2]}\r\n'
+                print('query_string= ',query_string)
+                data_list=[]
+                for _ in range(cmd_length):
+                    part=await reader.readline()
+                    if part and part.startswith(b'$'): 
+                        query_string=query_string+f'{part.decode()[:-2]}\r\n'
+                        str_len=int(part.decode()[1:-2])
+                        encoded_ip_str=await reader.readexactly(str_len + 2)
+                        ip_str=encoded_ip_str.decode()[:-2]
+                        data_list.append(ip_str)
+                        
+                        query_string=query_string+f'{ip_str}\r\n'
+                    else:
+                        finished=False                      
+                        break
+
+                if not finished:
+                    continue
+            else:
+                continue
+
+            ##############
+
+            #input_query=await reader.read(1024)            
+            # if not input_query:
+            #     await asyncio.sleep(0.2)
+            #     continue
+            # query_string=str(input_query.decode()) 
+            print('##### QUERY STRING #########')
+            print(query_string) 
+            print('##### DATA_LIST #########')
+            print(data_list) 
             if not utilities.allow_commands(userobjs,client_addr):
                 if 'AUTH' not in query_string.splitlines():
                     response='-NOAUTH Authentication required.\r\n'
                     writer.write(response.encode())
                     await writer.drain() 
                     continue 
-            print(">>>>>>>query_string : ",query_string)
+            # print(">>>>>>>query_string : ",query_string)
             if query_string == '*2\r\n$4\r\nKEYS\r\n$3\r\n"*"\r\n':
                 if RedisAsyncServer.data_store:
                     response=f'*{len(RedisAsyncServer.data_store)}\r\n'
@@ -1740,7 +1405,7 @@ def main():
         RedisAsyncServer.master_replid = '8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb'
         RedisAsyncServer.master_repl_offset = 0
         if RedisAsyncServer.rdb_dir and RedisAsyncServer.rdb_filename:
-            initialize_data_store()
+            RedisAsyncServer=datastore.initialize_data_store(RedisAsyncServer)
     if RedisAsyncServer.role == 'master':
         if RedisAsyncServer.appendonly == 'yes':
             print(">>>>>>>>AOF FILE REPLAY<<<<<<<<")
