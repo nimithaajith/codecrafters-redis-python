@@ -10,7 +10,7 @@ from .data_models import User,RedisServer,Replica,Master,StreamEntry,RedisObject
 from .utilities import get_last_stream_key, get_next_stream_key, get_xrange_response
 
 #globals
-RedisAsyncServer=None
+global RedisAsyncServer
 channel_subscriptions={}
 CommandDeque=deque()
 xread_stream_block_que=defaultdict(list)
