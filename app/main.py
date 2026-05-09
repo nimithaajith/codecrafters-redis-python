@@ -1285,10 +1285,10 @@ async def client_handler(reader,writer):
                     continue 
                 no_of_watched_keys=int(input_tokens[0].lstrip('*'))-1
                 watched_keys=[]
-                i=4
+                i=0
                 while i < no_of_watched_keys:
-                    watched_keys.append(input_tokens[i])
-                    i=i+2
+                    watched_keys.append(input_tokens[(i*2)+4])
+                    i=i+1
                 print("watched_keys =",watched_keys)
                 #locks keep track of key and if modified or not state
                 #state will be set as true if any other client modifies this key after this
