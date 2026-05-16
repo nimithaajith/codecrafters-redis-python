@@ -193,7 +193,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
         response=f'*3\r\n$9\r\nsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'
     elif data_list[0].lower() == 'unsubscribe':
         
-        channel_subscriptions=set_commands.unsubscribe(data_list,writer,client_addr,channel_subscriptions)               
+        channel_subscriptions=set_commands.unsubscribe(data_list,client_addr,channel_subscriptions)               
         channels=len(channel_subscriptions[client_addr][0])
         response=f'*3\r\n$11\r\nunsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'    
 
