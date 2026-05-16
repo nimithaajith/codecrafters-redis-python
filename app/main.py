@@ -996,7 +996,7 @@ async def command_propagation_handler():
                     print("slave adding SET offset",command_offset)
                     command_len=0
                     print(f'slave set the new value !!!!',RedisAsyncServer.data_store[key].data)
-                elif command[0].upper() == 'REPLCONF' and command[1].upper() == 'GETACK': 
+                elif data_list[0].upper() == 'REPLCONF' and data_list[1].upper() == 'GETACK': 
                     response=f'*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n${len(str(RedisAsyncServer.replica_command_offset))}\r\n{str(RedisAsyncServer.replica_command_offset)}\r\n'  
                     m_writer.write(response.encode())  
                     await m_writer.drain() 
@@ -1006,15 +1006,15 @@ async def command_propagation_handler():
                     print("slave adding offset getack",command_offset)
                     command_len=0
                     continue     
-                elif command[0].upper() == 'PING' :                        
+                elif data_list[0].upper() == 'PING' :                        
                     command_len=14
                     command_offset=command_offset + command_len
                     RedisAsyncServer.replica_command_offset = command_offset
                     print("slave adding PING offset",command_offset)
                     command_len=0
                     continue     
-                elif command[0] == 'INCR': 
-                    key =command[1]
+                elif data_list[0] == 'INCR': 
+                    key =data_list[1]
                     response=None
                     if key in RedisAsyncServer.data_store:
                         redis_obj=RedisAsyncServer.data_store[key]
