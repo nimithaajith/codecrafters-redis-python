@@ -173,6 +173,7 @@ async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
 
 async def command_handler(writer,client_addr,server_role,query_string,data_list):
     global RedisAsyncServer
+    global channel_subscriptions
     print('>>>>inside command_handler<<<<<')    
     modified_key=[]    
     if data_list[0] == 'PING':
@@ -186,12 +187,12 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
         response=f"${string_length}\r\n{echo_data}\r\n"  
         
     elif data_list[0].lower() == 'subscribe':
-        global channel_subscriptions
+       
         channel_subscriptions=set_commands.subscribe(data_list,writer,client_addr,channel_subscriptions)
         channels=len(channel_subscriptions[client_addr][0])
         response=f'*3\r\n$9\r\nsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'
     elif data_list[0].lower() == 'unsubscribe':
-        global channel_subscriptions
+        
         channel_subscriptions=set_commands.unsubscribe(data_list,writer,client_addr,channel_subscriptions)               
         channels=len(channel_subscriptions[client_addr][0])
         response=f'*3\r\n$11\r\nunsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'    
