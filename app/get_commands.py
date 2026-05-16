@@ -1,5 +1,7 @@
 from . import geo_decode
 from . import distance
+from datetime import timezone,timedelta,datetime
+from . utilities import get_xread_response
 
 
 ##############GEO SPATIAL#################################
@@ -182,3 +184,95 @@ def get_zrank(data_list,data_store):
         if not memberExists:
             response = '$-1\r\n'
     return response
+
+##############GENERAL#############################
+# CONFIG GET
+def config_get(data_list,RedisAsyncServer):
+    response=''
+    if data_list[2].lower() == 'dir':
+        rdb_dir=RedisAsyncServer.rdb_dir
+        if rdb_dir is not None:
+            response=f'*2\r\n$3\r\ndir\r\n${len(rdb_dir)}\r\n{rdb_dir}\r\n'
+        else:
+            path=RedisAsyncServer.dir
+            response=f'*2\r\n$3\r\ndir\r\n${len(path)}\r\n{path}\r\n'
+    elif data_list[2].lower() == 'dbfilename':
+        rdb_filename=RedisAsyncServer.rdb_filename
+        response=f'*2\r\n$10\r\ndbfilename\r\n${len(rdb_filename)}\r\n{rdb_filename}\r\n'
+    elif data_list[2].lower() == 'appendonly':
+        aof_status=RedisAsyncServer.appendonly
+        response=f'*2\r\n$10\r\nappendonly\r\n${len(aof_status)}\r\n{aof_status}\r\n'
+    elif data_list[2].lower() == 'appenddirname':
+        appenddir=RedisAsyncServer.appenddirname
+        response=f'*2\r\n$13\r\nappenddirname\r\n${len(appenddir)}\r\n{appenddir}\r\n'
+    elif data_list[2].lower() == 'appendfilename':
+        appendfile=RedisAsyncServer.appendfilename
+        response=f'*2\r\n$14\r\nappendfilename\r\n${len(appendfile)}\r\n{appendfile}\r\n'
+    elif data_list[2].lower() == 'appendfsync':
+        append_sync=RedisAsyncServer.appendfsync
+        response=f'*2\r\n$11\r\nappendfsync\r\n${len(append_sync)}\r\n{append_sync}\r\n'
+    return response
+
+# KEYS
+def get_keys(data_list,data_store):
+    if data_list[1] == '*':
+        all_keys=data_store.keys()
+        response=f'*{len(all_keys)}\r\n'    
+        for k in all_keys:
+            response=response+f'${len(k)}\r\n{k}\r\n'
+    else:
+        pattern=data_list[1]
+        k_count=0
+        response=''
+        import fnmatch
+        for k in all_keys:
+            if fnmatch.fnmatch(k, pattern):
+                response=response+f'${len(k)}\r\n{k}\r\n'
+                k_count+=1
+        response=f'*{k_count}\r\n'+response
+    return response
+
+#GETUSER
+def get_user(data_list,current_users):
+    user_name=data_list[2]
+    user=current_users[0]
+    flags=user.flags
+    if 'nopass' in flags:
+        response = '*4\r\n$5\r\nflags\r\n*1\r\n$6\r\nnopass\r\n$9\r\npasswords\r\n*0\r\n'
+    else:
+        password=user.password
+        response = f'*4\r\n$5\r\nflags\r\n*0\r\n$9\r\npasswords\r\n*1\r\n${len(password)}\r\n{password}\r\n'
+    return response
+
+
+#TYPE
+def get_type(data_list,data_store) :        
+    key=data_list[1]
+    if key in data_store.keys() :
+        data_type= data_store.get(key).data_type
+        response=f'+{data_type}\r\n'
+    else:
+        response=f'+none\r\n'
+    return response
+
+################ STREAMS ################################
+# xread
+def xread_streams(data_list,data_store):
+    xread_list=data_list[2:]
+    #keys of streams to be read from data_store
+    no_of_keys=int(len(xread_list)//2)
+    xread_dict={}
+    for i in range(no_of_keys):
+        xread_dict[xread_list[i]] =xread_list[i+no_of_keys]
+    if xread_dict:
+        response=f'*{no_of_keys}\r\n'
+    for key,stream_key in xread_dict.items():        
+        key_response=''
+        redis_obj=None
+        if key in data_store.keys():                                
+            redis_obj = data_store[key]
+            key_response,_= get_xread_response(key,redis_obj,stream_key)
+            response = response + key_response         
+    return response
+
+
