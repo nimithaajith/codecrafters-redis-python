@@ -668,31 +668,7 @@ async def client_handler(reader,writer):
             if not query_string or not data_list:
                 await asyncio.sleep(0.2)
                 continue
-            # cmd_length=int(line1.decode()[1:-2])
-            # if cmd_length:
-            #     finished=True
-            #     query_string=f'{line1.decode()[:-2]}\r\n'
-            #     print('query_string= ',query_string)
-            #     data_list=[]
-            #     for _ in range(cmd_length):
-            #         part=await reader.readline()
-            #         if part and part.startswith(b'$'): 
-            #             query_string=query_string+f'{part.decode()[:-2]}\r\n'
-            #             str_len=int(part.decode()[1:-2])
-            #             encoded_ip_str=await reader.readexactly(str_len + 2)
-            #             ip_str=encoded_ip_str.decode()[:-2]
-            #             data_list.append(ip_str)
-                        
-            #             query_string=query_string+f'{ip_str}\r\n'
-            #         else:
-            #             finished=False                      
-            #             break
-
-            #     if not finished:
-            #         continue
-            # else:
-            #     continue
-
+           
             
             print('#####PROCESSING QUERY #########')
             print(query_string) 
@@ -844,7 +820,7 @@ async def client_handler(reader,writer):
                             print("multi not aborted , RESPONSE =",response)
                             await writer.drain() 
                             MULTI[0]=False
-                            transaction_lock.locks[client_addr].clear()
+                    transaction_lock.locks[client_addr].clear()        
                     continue
                 else:
                     if data_list[0].upper() == 'DISCARD' : 
