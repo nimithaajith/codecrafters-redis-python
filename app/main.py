@@ -206,7 +206,8 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
     elif data_list[0] == 'CONFIG':
         if data_list[1] == 'GET':
             response= get_commands.config_get(data_list,RedisAsyncServer)            
-    elif data_list[0] == 'SET':        
+    elif data_list[0] == 'SET':     
+        key=data_list[1]   
         RedisAsyncServer.data_store=set_commands.set_key(data_list,RedisAsyncServer.data_store)         
         modified_key=[key,client_addr]
         print(f'{server_role} set the new value !!!!')
