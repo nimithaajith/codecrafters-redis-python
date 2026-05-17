@@ -174,11 +174,12 @@ async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
 async def command_handler(writer,client_addr,server_role,query_string,data_list):
     global RedisAsyncServer
     global channel_subscriptions
+    response=''
     print('>>>>inside command_handler<<<<<')    
     modified_key=[]    
-    if data_list[0] == 'PING':
+    if data_list[0].upper() == 'PING':
         response=f"+PONG\r\n"     
-    elif data_list[0] == 'ECHO':
+    elif data_list[0].upper() == 'ECHO':
         if len(data_list[1:] ) > 1:
             echo_data=" ".join(data_list[1:])
         else:
@@ -186,18 +187,18 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
         string_length=len(echo_data)
         response=f"${string_length}\r\n{echo_data}\r\n"  
         
-    elif data_list[0].lower() == 'subscribe':
+    elif data_list[0].upper() == 'SUBSCRIBE':
        
         channel_subscriptions=set_commands.subscribe(data_list,writer,client_addr,channel_subscriptions)
         channels=len(channel_subscriptions[client_addr][0])
         response=f'*3\r\n$9\r\nsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'
-    elif data_list[0].lower() == 'unsubscribe':
+    elif data_list[0].upper() == 'UNSUBSCRIBE':
         
         channel_subscriptions=set_commands.unsubscribe(data_list,client_addr,channel_subscriptions)               
         channels=len(channel_subscriptions[client_addr][0])
         response=f'*3\r\n$11\r\nunsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'    
 
-    elif data_list[0].lower() == 'publish':
+    elif data_list[0].upper() == 'PUBLISH':
         subscribers= await set_commands.publish_message(data_list,channel_subscriptions)        
         response=f':{subscribers}\r\n'
     elif data_list[0] == 'KEYS': 
@@ -227,7 +228,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
             print("sending response from WAIT :",no_of_ack_replicas)                
             response=f':{no_of_ack_replicas}\r\n'           
                         
-    elif data_list[0] == 'INCR': 
+    elif data_list[0].upper() == 'INCR': 
         key =data_list[1]
         response=None
         if key in RedisAsyncServer.data_store:
@@ -243,7 +244,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
             modified_key=[key,client_addr]
             response =f':1\r\n'
         
-    elif data_list[0] == 'GET': 
+    elif data_list[0].upper() == 'GET': 
         key=data_list[1]
         if key in RedisAsyncServer.data_store.keys() :
             val=RedisAsyncServer.data_store[key].data
@@ -256,7 +257,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
         else:
             response=f"$-1\r\n"
         
-    elif data_list[0] == 'LPUSH': 
+    elif data_list[0].upper() == 'LPUSH': 
         key=data_list[1] 
         new_data_list=data_list[2:]
         if key not in RedisAsyncServer.data_store.keys() :
@@ -271,7 +272,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
             pass                    
         response=f':{n}\r\n'                                                                   
             
-    elif data_list[0] == 'RPUSH': 
+    elif data_list[0].upper() == 'RPUSH': 
         key=data_list[1] 
         new_data_list=data_list[2:]
         if key not in RedisAsyncServer.data_store.keys() :
@@ -286,7 +287,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
             pass
         response=f':{n}\r\n'
                             
-    elif data_list[0] == 'LRANGE': 
+    elif data_list[0].upper() == 'LRANGE': 
         key=data_list[1] 
         start_index=int(data_list[2].strip())
         stop_index=int(data_list[3].strip())
@@ -320,7 +321,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
             response=f'*{length}\r\n'+'\r\n'.join(f'${len(item)}\r\n{item}' for item in result_list)+f'\r\n'
         
         
-    elif data_list[0] == 'LLEN': 
+    elif data_list[0].upper() == 'LLEN': 
         key=data_list[1] 
         length=0
         if key in RedisAsyncServer.data_store:
@@ -330,7 +331,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
         else:
             response=f':0\r\n'
         
-    elif data_list[0] == 'BLPOP': 
+    elif data_list[0].upper() == 'BLPOP': 
         key=data_list[1] 
         waits_for=float(data_list[2]) # in seconds, 0 for infinite
         if key in RedisAsyncServer.data_store:
@@ -372,7 +373,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
             print('###RESPONSE###')
             print(response)
             
-    elif data_list[0] == 'LPOP': 
+    elif data_list[0].upper() == 'LPOP': 
         key=data_list[1] 
         length=0
         n=len(data_list)
@@ -399,13 +400,13 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
         else:
             modified_key=[key,client_addr]
         
-    elif data_list[0] == 'XADD': 
+    elif data_list[0].upper() == 'XADD': 
         
         RedisAsyncServer.data_store,response,AddStream=await set_commands.xadd(data_list,RedisAsyncServer.data_store)
         if AddStream:
             key=data_list[1]
             modified_key=[key,client_addr]
-    elif data_list[0] == 'XRANGE': 
+    elif data_list[0].upper() == 'XRANGE': 
         key=data_list[1] 
         response=''
         if key in RedisAsyncServer.data_store.keys():            
@@ -414,7 +415,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
             redis_obj = RedisAsyncServer.data_store[key]
             response=get_xrange_response(redis_obj,start,stop)
                     
-    elif data_list[0] == 'XREAD': 
+    elif data_list[0].upper() == 'XREAD': 
         if data_list[1].upper() == 'STREAMS':
             response= get_commands.xread_streams(data_list,RedisAsyncServer.data_store)
                                            
@@ -450,7 +451,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
                 
         print(">>>>RESPONSE<<<<<")
         print(response)        
-    elif data_list[0].lower() == 'zadd':
+    elif data_list[0].upper() == 'ZADD':
         # ZADD racer_scores 8.0 "Sam"
         print('data_list =', data_list)
         key=data_list[1]
@@ -483,25 +484,25 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
         modified_key=[key,client_addr]
         if response is None:
             response=':1\r\n' 
-    elif data_list[0].lower() == 'zrank':
+    elif data_list[0].upper() == 'ZRANK':
         # ZRANK zset_key member
         response=get_commands.get_zrank(data_list,RedisAsyncServer.data_store)           
         
-    elif data_list[0].lower() == 'zrange' :
+    elif data_list[0].upper() == 'ZRANGE' :
         # ZRANGE racer_scores 0 2
         response=get_commands.get_zrange(data_list,RedisAsyncServer.data_store)
         
         print("zrange response = ",response)
-    elif data_list[0].lower() == 'zcard' :
+    elif data_list[0].upper() == 'ZCARD' :
         # ZCARD zset_key
         response=get_commands.get_zcard(data_list,RedisAsyncServer.data_store)
             
-    elif data_list[0].lower() == 'zscore' :
+    elif data_list[0].upper() == 'ZSCORE' :
         # ZSCORE zset_key member
         response = get_commands.get_zscore(data_list,RedisAsyncServer.data_store)
         
         print("zscore response = ",response)
-    elif data_list[0].lower() == 'zrem' :
+    elif data_list[0].upper() == 'ZREM' :
         # ZREM zset_key member
         key = data_list[1]
         member=data_list[2]
@@ -681,14 +682,14 @@ async def client_handler(reader,writer):
                     await writer.drain() 
                     continue 
             
-            if query_string == '*2\r\n$4\r\nKEYS\r\n$3\r\n"*"\r\n':
-                if RedisAsyncServer.data_store:
-                    response=f'*{len(RedisAsyncServer.data_store)}\r\n'
-                    for key in RedisAsyncServer.data_store.keys():
-                        response=response+f'${len(key)}\r\n{key}\r\n'
-                writer.write(response.encode())
-                await writer.drain() 
-                continue 
+            # if query_string == '*2\r\n$4\r\nKEYS\r\n$3\r\n"*"\r\n':
+            #     if RedisAsyncServer.data_store:
+            #         response=f'*{len(RedisAsyncServer.data_store)}\r\n'
+            #         for key in RedisAsyncServer.data_store.keys():
+            #             response=response+f'${len(key)}\r\n{key}\r\n'
+            #     writer.write(response.encode())
+            #     await writer.drain() 
+            #     continue 
             
             if client_addr in channel_subscriptions :
                 if len(channel_subscriptions[client_addr])>0 :
@@ -827,6 +828,7 @@ async def client_handler(reader,writer):
                         MULTI[0]=False
                         MULTI[1]=deque()
                         response=f"+OK\r\n"
+                        transaction_lock.locks[client_addr].clear()
                     else:
                         print('status = multi enabled,not EXEC')
                         MULTI[1].append(query_string)
@@ -844,6 +846,7 @@ async def client_handler(reader,writer):
                     response=b'-ERR DISCARD without MULTI\r\n' 
                     writer.write(response)
                     await writer.drain() 
+                    transaction_lock.locks[client_addr].clear()
                     continue  
             if 'REPLCONF' in data_list and 'ACK' in data_list and RedisAsyncServer.role == 'master':
                 replica_offset = int(data_list[2]) + len(b'*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n')                
@@ -956,30 +959,7 @@ async def command_propagation_handler():
                     print("slave adding getack offset",command_offset)
                     command_len=0
                     continue     
-                # input_tokens=query_string.splitlines()
-                # data_lists=deque()
-                # length_list=[]
-                # print("query_string=",query_string)        
-                # for token in input_tokens:
-                #     if len(token)>1 and token.startswith('*'):   
-                #         length_list.append(int(token.lstrip('*')))             
-                #         continue
-                #     if token.startswith('$') and token.strip() != '$':
-                #         continue
-                #     if token.strip() == '+OK' :
-                #         continue
-                #     data_lists.append(token.strip())
-                # print("data_list:",data_lists)
-                # commands_list=[]
-                # for l in length_list:
-                #     new_com=[]
-                #     i=1
-                #     while i<=l:
-                #         new_com.append(data_lists.popleft())
-                #         i=i+1
-                #     commands_list.append(new_com)
-
-                # for command in commands_list: 
+                 
                 print("processing command:",data_list)               
                 if data_list[0] == 'SET':
                     command_len=0                        
