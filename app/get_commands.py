@@ -9,7 +9,9 @@ from . utilities import get_xread_response,datastore_cleanup,key_expired
 def geo_search(data_list,data_store):
     key=data_list[1]
     locations=[]
-    if key in data_store.keys()  and not key_expired(data_store,key):                
+    print('GEOSEARCH key =',key)
+    if key in data_store.keys()  and not key_expired(data_store,key):  
+        print('GEOSEARCH key exists')              
         geopos=data_store[key].data 
         center_long = float(data_list[3])
         center_lat= float(data_list[4])
