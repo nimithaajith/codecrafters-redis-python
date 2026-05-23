@@ -3,7 +3,7 @@ from datetime import timezone,timedelta,datetime
 from collections import deque,defaultdict
 from . import geo_encode,hashing,utilities
 from .data_models import RedisObject,Transaction
-from .utilities import get_xrange_response,get_xread_response,setup_server
+from .utilities import get_xrange_response,get_xread_response,setup_server,datastore_cleanup,key_expired
 from . import get_commands
 from . import set_commands
 
@@ -172,7 +172,7 @@ async def get_ack_replicas(no_of_awaited_replicas,timeout,waittime):
     
 
 async def command_handler(writer,client_addr,server_role,query_string,data_list):
-    global RedisAsyncServer
+    global RedisAsyncServer    
     global channel_subscriptions
     response=''
     print('>>>>inside command_handler<<<<<')    
@@ -231,13 +231,14 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
     elif data_list[0].upper() == 'INCR': 
         key =data_list[1]
         response=None
-        if key in RedisAsyncServer.data_store:
+        if key in RedisAsyncServer.data_store :
             redis_obj=RedisAsyncServer.data_store[key]
-            if redis_obj.data.isdigit():
+            try:
+                float(redis_obj.data)                
                 new_val = str(int(redis_obj.data)+1)
                 redis_obj.data = new_val
                 response =f':{new_val}\r\n'
-            else:
+            except:
                 response="-ERR value is not an integer or out of range\r\n"
         else:
             RedisAsyncServer.data_store[key] = RedisObject(data = '1',data_type='string') 
@@ -640,12 +641,18 @@ async def get_command(cli_reader):
         return query_string,data_list      
     else:
         return '',[]  
-                            
+
+async def clean_datastore():  
+    global RedisAsyncServer
+    while True:
+        RedisAsyncServer.data_store=datastore_cleanup(RedisAsyncServer.data_store) 
+        await asyncio.sleep(1)                         
     
 
 async def client_handler(reader,writer):
     try:
         global RedisAsyncServer
+        asyncio.create_task(clean_datastore())   
         client_addr = writer.get_extra_info('peername')  
         userobjs=RedisAsyncServer.clients  
         print('current users=',userobjs)   
@@ -882,7 +889,7 @@ async def client_handler(reader,writer):
                 response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,data_list)
             except Exception as e:
                 print("EXCEPTION=",e)
-            if data_list[0].upper() == 'SET':
+            if data_list[0].upper() == 'SET' or data_list[0].upper() == 'INCR':
                 if RedisAsyncServer.role == 'master' :
                     CommandDeque.append(query_string)
                     await propagate_command()
@@ -964,18 +971,12 @@ async def command_propagation_handler():
                 if data_list[0] == 'SET':
                     command_len=0                        
                     RedisAsyncServer.data_store=set_commands.set_key(data_list,RedisAsyncServer.data_store)
-                    command_string=''
-                    # for s in command:
-                    #     command_string=command_string+f'${len(str(s))}\r\n{str(s)}\r\n'
-                    # command_string=f'*{len(command)}\r\n'+command_string
                     command_len=len(command)
-                    # print("SET string",command_string)
-                    # print("SET offset",command_len)
                     command_offset=command_offset+command_len
                     RedisAsyncServer.replica_command_offset = command_offset
                     print("slave adding SET offset",command_offset)
                     command_len=0
-                    print(f'slave set the new value !!!!',RedisAsyncServer.data_store[key].data)
+                    print('slave set the new value !!!!')
                 elif data_list[0].upper() == 'REPLCONF' and data_list[1].upper() == 'GETACK': 
                     response=f'*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n${len(str(RedisAsyncServer.replica_command_offset))}\r\n{str(RedisAsyncServer.replica_command_offset)}\r\n'  
                     m_writer.write(response.encode())  
@@ -998,11 +999,12 @@ async def command_propagation_handler():
                     response=None
                     if key in RedisAsyncServer.data_store:
                         redis_obj=RedisAsyncServer.data_store[key]
-                        if redis_obj.data.isdigit():
+                        try:
+                            float(redis_obj.data)
                             new_val = str(int(redis_obj.data)+1)
                             redis_obj.data = new_val
                             # response =f':{new_val}\r\n'
-                        else:
+                        except:
                             pass
                             # response="-ERR value is not an integer or out of range\r\n"
                     else:

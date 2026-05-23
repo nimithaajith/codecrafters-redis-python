@@ -342,3 +342,28 @@ def get_xread_response(key,redis_obj,start):
     print("RESULT = ",result_str)
     return result_str,n1
 
+
+#datastore clean up
+def datastore_cleanup(datastore):
+    temp_store=datastore
+    if datastore:
+        for key in temp_store:
+            expiry=temp_store[key].exp
+            if expiry :
+                if expiry <= datetime.now(timezone.utc) :
+                    del datastore[key]
+    return datastore
+
+def key_expired(key,datastore):
+    temp_store=datastore
+    if datastore:
+        if key in temp_store:
+            expiry=temp_store[key].exp
+            if expiry :
+                if expiry <= datetime.now(timezone.utc) :
+                    del datastore[key]
+                    return True
+    return False
+
+
+
