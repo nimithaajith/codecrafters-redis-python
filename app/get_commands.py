@@ -10,7 +10,7 @@ def geo_search(data_list,data_store):
     key=data_list[1]
     locations=[]
     print('GEOSEARCH key =',key)
-    if key in data_store.keys()  and not key_expired(data_store,key):  
+    if key in data_store  and not key_expired(key,data_store):  
         print('GEOSEARCH key exists')              
         geopos=data_store[key].data 
         center_long = float(data_list[3])
@@ -43,7 +43,7 @@ def geo_search(data_list,data_store):
 def geo_dist(data_list,data_store):
     key=data_list[1]
     locations=data_list[2:]            
-    if key in data_store and not key_expired(data_store,key):                
+    if key in data_store and not key_expired(key,data_store):                
         geopos=data_store[key].data 
         latitude1 = None
         longitude1= None
@@ -73,7 +73,7 @@ def geo_position(data_list,data_store):
     members=data_list[2:]
     m_len=len(members)
     response=f'*{m_len}\r\n'
-    if key in data_store and not key_expired(data_store,key):                
+    if key in data_store and not key_expired(key,data_store):                
         geopos=data_store[key].data                
         for query_member in members:
             is_member=False
@@ -98,7 +98,7 @@ def geo_position(data_list,data_store):
 def get_zscore(data_list,data_store):
     key = data_list[1]
     member=data_list[2]
-    if key not in data_store or key_expired(data_store,key) :
+    if key not in data_store or key_expired(key,data_store) :
         response = "$-1\r\n" 
     else:
         is_member = False
@@ -116,7 +116,7 @@ def get_zscore(data_list,data_store):
 # ZCARD zset_key
 def get_zcard(data_list,data_store) :
     key = data_list[1]            
-    if key not in data_store or key_expired(data_store,key) :
+    if key not in data_store or key_expired(key,data_store) :
         response = ":0\r\n"         
     else:
         scores=data_store[key].data
@@ -131,7 +131,7 @@ def get_zrange(data_list,data_store) :
     end_inx=int(data_list[3])
     print(f"zrange[{key}] : [{start_inx} : {end_inx}]")
     slice = True
-    if key not in data_store or key_expired(data_store,key):
+    if key not in data_store or key_expired(key,data_store):
         response = '*0\r\n' 
         slice = False
     else:
@@ -172,7 +172,7 @@ def get_zrange(data_list,data_store) :
 def get_zrank(data_list,data_store):
     key=data_list[1]
     member = data_list[2] 
-    if key not in data_store or key_expired(data_store,key):
+    if key not in data_store or key_expired(key,data_store):
         response = '$-1\r\n' 
     else:
         memberExists = False
@@ -251,7 +251,7 @@ def get_user(data_list,current_users):
 #TYPE
 def get_type(data_list,data_store) :        
     key=data_list[1]
-    if key in data_store.keys() and not key_expired(data_store,key):
+    if key in data_store.keys() and not key_expired(key,data_store):
         data_type= data_store.get(key).data_type
         response=f'+{data_type}\r\n'
     else:
@@ -272,7 +272,7 @@ def xread_streams(data_list,data_store):
     for key,stream_key in xread_dict.items():        
         key_response=''
         redis_obj=None
-        if key in data_store.keys() and not key_expired(data_store,key):                                
+        if key in data_store.keys() and not key_expired(key,data_store):                                
             redis_obj = data_store[key]
             key_response,_= get_xread_response(key,redis_obj,stream_key)
             response = response + key_response         
