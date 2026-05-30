@@ -748,7 +748,8 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
             exception_raised=True
         if not exception_raised:
             if not response:
-                response='+OK\r\n'            
+                response='+OK\r\n'
+        print("whoami response = ",response)            
     elif data_list[0].upper() == 'AUTH':
         try:
             #AUTH <username> <password>
