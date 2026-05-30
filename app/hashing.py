@@ -13,6 +13,7 @@ def scrypt_hashing(text:str) ->str :
     salt = os.urandom(16)
     try:
         hash_val = hashlib.scrypt(password=text.encode("utf-8"), salt=salt,n=2**14,r=8,p=1,dklen=64)
+        print("pwd =",hash_val)
         return salt.hex() + ":" + hash_val.hex()
     except  Exception as e:
         raise RuntimeError(f"scrypt hashing failed: {e}")

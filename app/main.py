@@ -720,6 +720,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
             current_users=RedisAsyncServer.clients
             if data_list[1].upper() == 'WHOAMI':            
                 response = '$7\r\ndefault\r\n'
+                print("inside whoam i, response =",response)
             elif data_list[1].upper() == 'GETUSER':
                 response = get_commands.get_user(data_list,current_users)            
             elif data_list[1].upper() == 'SETUSER':
