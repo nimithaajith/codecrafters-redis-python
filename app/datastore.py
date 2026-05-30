@@ -2,6 +2,7 @@ import os
 import shutil
 from datetime import timezone,datetime
 from .data_models import RedisObject
+from pathlib import Path
 #initialize datastore from RDB snapshot instance
 def initialize_data_store(RedisAsyncServer):
     try:        
@@ -9,7 +10,7 @@ def initialize_data_store(RedisAsyncServer):
         rdb_filename=RedisAsyncServer.rdb_filename
         os.makedirs(rdb_dir, exist_ok=True)
         filepath=os.path.join(rdb_dir,rdb_filename)
-        basedir="C:\\Users\\Ardra\\codecrafters-redis-python"
+        basedir=Path(__file__).resolve().parent
         os.makedirs(basedir, exist_ok=True)  
         tempfilepath=os.path.join(basedir,rdb_filename) 
             
@@ -18,6 +19,7 @@ def initialize_data_store(RedisAsyncServer):
         # b'REDIS0011\xfa\tredis-ver\x057.2.0\xfa\nredis-bits\xc0@\xfe\x00\xfb\x01\x00\x00\x05mango\x06orange\xff\xeb)\xe1\xcfp\x08\x1f\x9a'
         with open(tempfilepath,'rb') as rdbfile:
             print(rdbfile.read(1024))
+        #test sample rdb file and content
         # tempfilepath='./app/temp.rdb'
         # with open(tempfilepath,'wb') as rdbfile:
         #     rdbfile.write(b'REDIS0011\xfa\tredis-ver\x057.2.0\xfa\nredis-bits\xc0@\xfe\x00\xfb\x04\x00\x00\x05grape\x06orange\x00\traspberry\tpineapple\x00\x06orange\x05mango\x00\tblueberry\x06banana\xffue\xb86\xd9\x03\xaa8')

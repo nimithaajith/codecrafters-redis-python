@@ -4,58 +4,66 @@ import os
 from . import datastore
 from datetime import datetime,timedelta,timezone
 from collections import deque
+import logging
 ###################SERVER START UP################################ 
-def aof_replay_file(data_store,aof_path,line) :    
-    m_commands=None
-    aof_file_name=line.split()[1]    
-    aof_file=os.path.join(aof_path,aof_file_name)
-    with open(aof_file,'r') as af:
-        m_commands=af.read()
-    if m_commands :    
-        # for m_command in m_commands:
-        print(">>>AOF command = ",m_commands)
-        input_tokens=m_commands.splitlines()
-        i=0        
-        commands=deque()
-        while i<len(input_tokens):
-            tokens=[]
-            if input_tokens[i].startswith('*') and len(input_tokens[i]) >1:
-                no_of_elements=int(input_tokens[i].lstrip('*')) 
-                count=no_of_elements*2
-                tokens.append(input_tokens[i])
-                for _ in range(count):
-                    i=i+1
+def aof_replay_file(data_store,aof_path,line) :  
+    try:  
+        logging.info("########## AOF file replay ############")
+        m_commands=None
+        aof_file_name=line.split()[1]    
+        aof_file=os.path.join(aof_path,aof_file_name)
+        with open(aof_file,'r') as af:
+            m_commands=af.read()
+        if m_commands :    
+            # for m_command in m_commands:
+            # print(">>>AOF command = ",m_commands)
+            input_tokens=m_commands.splitlines()
+            i=0        
+            commands=deque()
+            while i<len(input_tokens):
+                tokens=[]
+                if input_tokens[i].startswith('*') and len(input_tokens[i]) >1:
+                    no_of_elements=int(input_tokens[i].lstrip('*')) 
+                    count=no_of_elements*2
                     tokens.append(input_tokens[i])
-                print(">>>AOF command found = ",tokens)
-                commands.append(tokens)                
-            i=i+1
-        if commands:
-            for tokens in commands:           
-                data_list=[]            
-                for token in tokens:
-                    if len(token)>1 and token.startswith('*'):                
-                        continue
-                    if token.startswith('$') and token.strip() != '$':
-                        continue
-                    data_list.append(token.strip())
-                if data_list:
-                    if data_list[0].upper() == 'SET':
-                        key=data_list[1]
-                        val=data_list[2]
-                        data_type = 'string'
-                        expiry =None
-                        if len(data_list) > 3:
-                            if data_list[3] == 'PX':
-                                expiry = datetime.now(timezone.utc) + timedelta(milliseconds=int(data_list[4]))
-                            elif data_list[3] == 'EX' :
-                                expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))                        
-                        data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type)
-        else:
-            print("NO Commands to replay in AOF")                                        
-    return data_store
+                    for _ in range(count):
+                        i=i+1
+                        tokens.append(input_tokens[i])
+                    logging.info(f'AOF command found...appending...')
+                    commands.append(tokens)                
+                i=i+1
+            if commands:
+                for tokens in commands:           
+                    data_list=[]            
+                    for token in tokens:
+                        if len(token)>1 and token.startswith('*'):                
+                            continue
+                        if token.startswith('$') and token.strip() != '$':
+                            continue
+                        data_list.append(token.strip())
+                    if data_list:
+                        if data_list[0].upper() == 'SET':
+                            key=data_list[1]
+                            val=data_list[2]
+                            data_type = 'string'
+                            expiry =None
+                            if len(data_list) > 3:
+                                if data_list[3] == 'PX':
+                                    expiry = datetime.now(timezone.utc) + timedelta(milliseconds=int(data_list[4]))
+                                elif data_list[3] == 'EX' :
+                                    expiry = datetime.now(timezone.utc) + timedelta(seconds=int(data_list[4]))                        
+                            data_store[key] = RedisObject(data = val,exp=expiry,data_type=data_type)
+            else:
+                logging.info(f'NO Commands to replay in AOF...')                    
+                                                     
+        return data_store
+    except Exception as e:
+        logging.exception('AOF replay failed, %s',str(e))
+        raise Exception("Runtime error during AOF file replay , %s",str(e))
 
 
 def setup_server(sys_args,port_number):
+    logging.info("######## Setting up the server ############")   
     if '--replicaof' in sys_args:        
         RedisAsyncServer=Replica()
     else:        
@@ -80,8 +88,9 @@ def setup_server(sys_args,port_number):
             RedisAsyncServer.master_host=master_host
             RedisAsyncServer.master_port=master_port
             
-        except:
-            pass
+        except Exception as e:
+            logging.exception('Runtime error during replica set up, %s',str(e))
+        
     #--dir /tmp/redis-files --dbfilename dump.rdb
     if '--dir' in sys_args:        
         RDB_DIR=sys_args[sys_args.index('--dir')+1]
@@ -107,95 +116,118 @@ def setup_server(sys_args,port_number):
 
     if RedisAsyncServer.role=='master':
         if RedisAsyncServer.appendonly == 'yes' :
-            aof_dir=os.path.join(RedisAsyncServer.dir,RedisAsyncServer.appenddirname)
-            os.makedirs(aof_dir, exist_ok=True)
-            new_aof_file=RedisAsyncServer.appendfilename+'.1.incr.aof' 
-            manifest_file=RedisAsyncServer.appendfilename+'.manifest'
-            aof_filepath=os.path.join(aof_dir,new_aof_file)
-            with open(aof_filepath,'a') as f:
-                print(f'AOF file check by master......')
-            manifest_file_path=os.path.join(aof_dir,manifest_file)
-            with open(manifest_file_path,'a') as mf:
-                print(f'manifest file check by master')
-                data_str=f'file {new_aof_file} seq 1 type i'
-                mf.write(data_str)
+            try:
+                aof_dir=os.path.join(RedisAsyncServer.dir,RedisAsyncServer.appenddirname)
+                os.makedirs(aof_dir, exist_ok=True)
+                new_aof_file=RedisAsyncServer.appendfilename+'.1.incr.aof' 
+                manifest_file=RedisAsyncServer.appendfilename+'.manifest'
+                aof_filepath=os.path.join(aof_dir,new_aof_file)
+                with open(aof_filepath,'a') as f:
+                    logging.info(f'AOF file check by master......')
+                manifest_file_path=os.path.join(aof_dir,manifest_file)
+                with open(manifest_file_path,'a') as mf:
+                    print(f'manifest file check by master')
+                    data_str=f'file {new_aof_file} seq 1 type i'
+                    mf.write(data_str)
+            except Exception as e:
+                raise Exception("Runtime error ,handling --appendonly by master , %s",str(e))
+        
+                    # data_str=f'file {new_aof_file} seq 1 type i'
+                    # print("Manifest file created and data written = ",mf.write(data_str))
                 
-                # data_str=f'file {new_aof_file} seq 1 type i'
-                # print("Manifest file created and data written = ",mf.write(data_str))
-            
         RedisAsyncServer.master_replid = '8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb'
         RedisAsyncServer.master_repl_offset = 0
         if RedisAsyncServer.rdb_dir and RedisAsyncServer.rdb_filename:
-            RedisAsyncServer=datastore.initialize_data_store(RedisAsyncServer)
+            try:
+                RedisAsyncServer=datastore.initialize_data_store(RedisAsyncServer)
+            except Exception as e:
+                raise Exception("Runtime error during database initialization , %s",str(e))
     if RedisAsyncServer.role == 'master':
         if RedisAsyncServer.appendonly == 'yes':
             print(">>>>>>>>AOF FILE REPLAY<<<<<<<<")
-            aof_path=os.path.join(RedisAsyncServer.dir,RedisAsyncServer.appenddirname)
-            print('aof_path =',aof_path)
-            if os.path.exists(aof_path) :
-                manifest_file=os.path.join(aof_path,RedisAsyncServer.appendfilename+'.manifest')
-                print("manifest_file = ",manifest_file)
-                if os.path.exists(manifest_file):
-                    print("Opening manifest file")
-                    with open(manifest_file,'r') as mf:
-                        contents=mf.readlines()  
-                        print("Contents of manifest file ::",contents)
-                        for line in contents:
-                            print("line in aof file =",line)
-                            if 'type i' in line:
-                                print("Calling aof reply......")
-                                RedisAsyncServer.data_store=aof_replay_file(RedisAsyncServer.data_store,aof_path,line) 
-                                break 
+            try:
+                aof_path=os.path.join(RedisAsyncServer.dir,RedisAsyncServer.appenddirname)
+                print('aof_path =',aof_path)
+                if os.path.exists(aof_path) :
+                    manifest_file=os.path.join(aof_path,RedisAsyncServer.appendfilename+'.manifest')
+                    print("manifest_file = ",manifest_file)
+                    if os.path.exists(manifest_file):
+                        print("Opening manifest file")
+                        with open(manifest_file,'r') as mf:
+                            contents=mf.readlines()  
+                            print("Contents of manifest file ::",contents)
+                            for line in contents:
+                                print("line in aof file =",line)
+                                if 'type i' in line:
+                                    print("Calling aof reply......")
+                                    RedisAsyncServer.data_store=aof_replay_file(RedisAsyncServer.data_store,aof_path,line) 
+                                    break 
+            except Exception as e:
+                logging.exception('Runtime error during AOF set up by master, %s',str(e))   
+                raise Exception("Runtime error during AOF replay  by master , %s",str(e))     
     return RedisAsyncServer,port_number 
 
 #add modifying commands to aof
 def add_command(query_string,RedisAsyncServer) :
-    aof_dir=os.path.join(RedisAsyncServer.dir,RedisAsyncServer.appenddirname)                    
-    manifest_file=RedisAsyncServer.appendfilename+'.manifest'        
-    manifest_file_path=os.path.join(aof_dir,manifest_file)
-    data_str=None
-    with open(manifest_file_path,'r') as mf:
-        data_str= mf.readline()
-        print("manifest file read =",data_str)
-    if data_str is not None:
-        aof_file_name=data_str.split()[1]
-        aof_file_path=os.path.join(aof_dir,aof_file_name)
-        with open(aof_file_path,'a') as af:
-            data_cmd=f'{query_string}'
-            af.write(data_cmd)    
-            print("Added SET to aoffile = ",data_cmd)   
-            
+    try:
+        aof_dir=os.path.join(RedisAsyncServer.dir,RedisAsyncServer.appenddirname)                    
+        manifest_file=RedisAsyncServer.appendfilename+'.manifest'        
+        manifest_file_path=os.path.join(aof_dir,manifest_file)
+        data_str=None
+        with open(manifest_file_path,'r') as mf:
+            data_str= mf.readline()
+            print("manifest file read =",data_str)
+        if data_str is not None:
+            aof_file_name=data_str.split()[1]
+            aof_file_path=os.path.join(aof_dir,aof_file_name)
+            with open(aof_file_path,'a') as af:
+                data_cmd=f'{query_string}'
+                af.write(data_cmd)    
+                print("Added SET to aoffile = ",data_cmd)   
+    except Exception as e:
+        logging.exception('Appending command to  AOF by master failed, %s',str(e))   
+        raise Exception("Runtime error during AOF append  by master , %s",str(e))            
                
 ##########CLIENTS/USERS##########################
 
 def add_client(username,userobjs,client_address):
-    for obj in userobjs:
-        if username == obj.username:
-            userobjs.remove(obj)
-            obj.client_address.append(client_address)
-            userobjs.append(obj)
-    return userobjs
+    try:
+        for obj in userobjs:
+            if username == obj.username:
+                userobjs.remove(obj)
+                obj.client_address.append(client_address)
+                userobjs.append(obj)
+        return userobjs
+    except Exception as e:
+        raise Exception("Adding client to users failed, %s", str(e))
 
 
 def client_exists(userobjs,client_address):
-    addr_list=[]
-    for obj in userobjs:
-        for client in obj.client_address:
-            addr_list.append(client)
-    if client_address in addr_list:
-        return True
-    return False
+    try:
+        addr_list=[]
+        for obj in userobjs:
+            for client in obj.client_address:
+                addr_list.append(client)
+        if client_address in addr_list:
+            return True
+        return False
+    except Exception as e:
+        raise Exception("Checking for client in users failed, %s", str(e))
+
 
 def allow_commands(userobjs,client_address):
-    addr_list=[]
-    for obj in userobjs:
-        for client in obj.client_address:
-            addr_list.append(client)
-    if client_address not in addr_list:        
-        for user in userobjs:
-            if user.username == 'default'  and ('nopass' not in user.flags):
-                return False
-    return True        
+    try:
+        addr_list=[]
+        for obj in userobjs:
+            for client in obj.client_address:
+                addr_list.append(client)
+        if client_address not in addr_list:        
+            for user in userobjs:
+                if user.username == 'default'  and ('nopass' not in user.flags):
+                    return False
+        return True        
+    except Exception as e:
+        raise Exception("Checkinf for allowed Commands failed, %s", str(e))
 
 
 ###################STREAMS################################                
@@ -345,25 +377,32 @@ def get_xread_response(key,redis_obj,start):
 
 #datastore clean up
 def datastore_cleanup(datastore):
-    temp_store=datastore
-    if datastore:
-        for key in temp_store:
-            expiry=temp_store[key].exp
-            if expiry :
-                if expiry <= datetime.now(timezone.utc) :
-                    del datastore[key]
+    try:
+        temp_store=datastore
+        if datastore:
+            for key in temp_store:
+                expiry=temp_store[key].exp
+                if expiry :
+                    if expiry <= datetime.now(timezone.utc) :
+                        del datastore[key]
+    except Exception as e:
+        raise RuntimeError("Unexpected error during datastore_cleanup utility function, %s",str(e))
     return datastore
 
 def key_expired(key,datastore):
-    temp_store=datastore
-    if datastore:
-        if key in temp_store:
-            expiry=temp_store[key].exp
-            if expiry :
-                if expiry <= datetime.now(timezone.utc) :
-                    del datastore[key]
-                    return True
-    return False
+    try:
+        temp_store=datastore
+        if datastore:
+            if key in temp_store:
+                expiry=temp_store[key].exp
+                if expiry :
+                    if expiry <= datetime.now(timezone.utc) :
+                        del datastore[key]
+                        return True
+        return False
+    except Exception as e:
+        raise RuntimeError("Unexpected error during key_expired utility function, %s",str(e))
+    
 
 
 
