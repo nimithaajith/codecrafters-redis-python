@@ -1081,7 +1081,7 @@ async def client_handler(reader,writer):
                     await propagate_command()
                     query_string=''                                       
             if not response == 'REPLCONF ACK':
-                print("response got from client handler,response =",response)                
+                print("response got from client handler")                
                 writer.write(response.encode())
                 await writer.drain() 
             if not CONNECT:
