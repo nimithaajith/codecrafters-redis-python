@@ -715,8 +715,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
 
     elif data_list[0].upper() == 'ACL':
         response=''
-        try:
-            
+        try:            
             current_users=RedisAsyncServer.clients
             if data_list[1].upper() == 'WHOAMI':            
                 response = '$7\r\ndefault\r\n'
@@ -744,7 +743,8 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
                                 exception_raised=True
                                 break                
         except Exception as e:
-            response=f"-ERR : ACL command handling failed {str(e)}\r\n"   
+            response=f"-ERR : ACL command handling failed {str(e)}\r\n"  
+            print("exception =",str(e)) 
             exception_raised=True
         if not exception_raised:
             if not response:
