@@ -745,10 +745,9 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
         except Exception as e:
             response=f"-ERR : ACL command handling failed {str(e)}\r\n"  
             print("exception =",str(e)) 
-            exception_raised=True
-        if not exception_raised:
-            if not response:
-                response='+OK\r\n'
+            exception_raised=True        
+        if not response:
+            response='+OK\r\n'
         print("whoami response = ",response)            
     elif data_list[0].upper() == 'AUTH':
         try:
@@ -1082,7 +1081,7 @@ async def client_handler(reader,writer):
                     await propagate_command()
                     query_string=''                                       
             if not response == 'REPLCONF ACK':
-                print("response got from client handler")                
+                print("response got from client handler,response =",response)                
                 writer.write(response.encode())
                 await writer.drain() 
             if not CONNECT:
