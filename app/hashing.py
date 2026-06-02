@@ -35,4 +35,10 @@ def verify_scrypt_hashing(password_text:str,hashed_password:str) ->bool :
     except  Exception as e:
         raise RuntimeError(f"scrypt hashing failed: {e}")
     
+def get_password(pw):
+    if ':' not in pw:
+        raise ValueError("Stored hash format invalid. Expected 'salt:key'.")
+    
+    return pw.split(':',1)[1]
+
 

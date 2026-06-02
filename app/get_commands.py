@@ -2,7 +2,7 @@ from . import geo_decode
 from . import distance
 from datetime import timezone,timedelta,datetime
 from . utilities import get_xread_response,datastore_cleanup,key_expired
-
+from . hashing import get_password
 
 ##############GEO SPATIAL#################################
 # GEOSEARCH key FROMLONLAT longitude latitude BYRADIUS radius unit(m) 
@@ -284,8 +284,11 @@ def get_user(data_list,current_users):
     if 'nopass' in flags:
         response = '*4\r\n$5\r\nflags\r\n*1\r\n$6\r\nnopass\r\n$9\r\npasswords\r\n*0\r\n'
     else:
-        password=user.password
-        response = f'*4\r\n$5\r\nflags\r\n*0\r\n$9\r\npasswords\r\n*1\r\n${len(password)}\r\n{password}\r\n'
+        try:
+            password=get_password(user.password)
+            response = f'*4\r\n$5\r\nflags\r\n*0\r\n$9\r\npasswords\r\n*1\r\n${len(password)}\r\n{password}\r\n'
+        except Exception as e:
+            response="-Err password retrieval failed"
     return response
 
 
