@@ -732,7 +732,8 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
                         if user.username == user_name:
                             RedisAsyncServer.clients.remove(user)
                             try:
-                                user.password = hashing.scrypt_hashing(raw_password)
+                                # user.password = hashing.scrypt_hashing(raw_password)
+                                user.password = hashing.hash_password(raw_password)
                                 flags=user.flags
                                 if 'nopass' in flags:
                                     user.flags.remove('nopass') 
@@ -757,7 +758,8 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
             response='-WRONGPASS invalid username-password pair or user is disabled.\r\n'            
             for user in RedisAsyncServer.clients:
                 if user.username == user_name:
-                    if hashing.verify_scrypt_hashing(str(user_pass),user.password) :
+                    # if hashing.verify_scrypt_hashing(str(user_pass),user.password) :
+                    if hashing.hash_password(str(user_pass)).lower() == user.password.lower() :
                         response='+OK\r\n'
                         if not utilities.client_exists(RedisAsyncServer.clients,client_addr):
                             RedisAsyncServer.clients=utilities.add_client(user_name,RedisAsyncServer.clients,client_addr)

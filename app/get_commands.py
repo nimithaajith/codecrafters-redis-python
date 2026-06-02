@@ -285,7 +285,8 @@ def get_user(data_list,current_users):
         response = '*4\r\n$5\r\nflags\r\n*1\r\n$6\r\nnopass\r\n$9\r\npasswords\r\n*0\r\n'
     else:
         try:
-            password=get_password(user.password)
+            # password=get_password(user.password)
+            password = user.password
             response = f'*4\r\n$5\r\nflags\r\n*0\r\n$9\r\npasswords\r\n*1\r\n${len(password)}\r\n{password}\r\n'
         except Exception as e:
             response="-Err password retrieval failed"
