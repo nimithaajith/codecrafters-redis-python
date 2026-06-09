@@ -393,7 +393,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
                         async with redis_obj.condition: 
                             for new_data in new_data_list:
                                 redis_obj.data.insert(0,new_data) 
-                        redis_obj.condition.notify_all()
+                            redis_obj.condition.notify_all()
                         modified_key=[key,client_addr]
                                        
                     response=f':{n}\r\n' 
