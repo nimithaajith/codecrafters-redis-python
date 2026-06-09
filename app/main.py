@@ -548,7 +548,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
              response='-ERR wrong number of arguments'         
                     
     elif data_list[0].upper() == 'LPOP': 
-        if len(data_list) == 3:
+        if len(data_list) >= 2:
             try:
                 key=data_list[1] 
                 length=0
