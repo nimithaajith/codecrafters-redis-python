@@ -58,31 +58,33 @@ async def get_blpop_response(client_tuple) :
         global RedisAsyncServer
         key =client_tuple[2]
         redis_obj=RedisAsyncServer.data_store[key]
-             
-        async with redis_obj.condition:
-            print("waiting for redis_obj.condition..")
-            print("redis_obj.condition")
-            print(redis_obj.blocked_clients)
-            print(redis_obj.blocked_clients[0])
-            print(redis_obj.data)
-            await redis_obj.condition.wait_for(
-                lambda: (client_tuple not in redis_obj.blocked_clients
-                    or (
-                    redis_obj.blocked_clients
-                    and client_tuple == redis_obj.blocked_clients[0]
-                    and redis_obj.data
-                    )
-                )
-            ) 
-            print("waiting stopped for redis_obj.condition..")
-            if client_tuple not in redis_obj.blocked_clients:
-                return '*-1\r\n'  
-            print("data fetching and sending from get_blpop_response")
-            value = redis_obj.data.pop(0)
-            redis_obj.blocked_clients.popleft()
-            redis_obj.condition.notify_all()     
-            response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'                                               
-            return response                
+        try:
+            async with asyncio.timeout(client_tuple[1]):     
+                async with redis_obj.condition:                           
+                    await redis_obj.condition.wait_for(
+                        lambda: (client_tuple not in redis_obj.blocked_clients
+                            or (
+                            redis_obj.blocked_clients
+                            and client_tuple == redis_obj.blocked_clients[0]
+                            and redis_obj.data
+                            )
+                            
+                        )
+                    )                 
+                    print("waiting stopped for redis_obj.condition..")
+                    if client_tuple not in redis_obj.blocked_clients:
+                        return '*-1\r\n'  
+                    print("data fetching and sending from get_blpop_response")
+                    value = redis_obj.data.pop(0)
+                    redis_obj.blocked_clients.popleft()
+                    redis_obj.condition.notify_all()     
+                    response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'                                               
+                    return response  
+        except TimeoutError:
+            if client_tuple in redis_obj.blocked_clients:
+                redis_obj.blocked_clients.remove(client_tuple)
+            print("Timed out")
+            return '*-1\r\n'               
              
     except Exception as e:
         logging.exception("Exception during BLPOP response creation. %s",str(e))
@@ -515,7 +517,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
                             else:
                                 expires_on=datetime.now(timezone.utc) + timedelta(seconds=waits_for)
                             
-                            client_tuple=tuple((writer,expires_on,key))
+                            client_tuple=tuple((writer,waits_for,key))
                             redis_obj.blocked_clients.append(client_tuple)                              
                             print('###add to blocked clients###')
                             response = await get_blpop_response(client_tuple)
@@ -531,7 +533,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
                         else:
                             expires_on=datetime.now(timezone.utc) + timedelta(seconds=waits_for)
                         
-                        client_tuple=tuple((writer,expires_on,key))
+                        client_tuple=tuple((writer,waits_for,key))
                         redis_obj.blocked_clients.append(client_tuple)  
                         response = await get_blpop_response(client_tuple)
                         
