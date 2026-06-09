@@ -60,6 +60,11 @@ async def get_blpop_response(client_tuple) :
         redis_obj=RedisAsyncServer.data_store[key]
              
         async with redis_obj.condition:
+            print("waiting for redis_obj.condition..")
+            print("redis_obj.condition")
+            print(redis_obj.blocked_clients)
+            print(redis_obj.blocked_clients[0])
+            print(redis_obj.data)
             await redis_obj.condition.wait_for(
                 lambda: (client_tuple not in redis_obj.blocked_clients
                     or (
@@ -69,6 +74,7 @@ async def get_blpop_response(client_tuple) :
                     )
                 )
             ) 
+            print("waiting stopped for redis_obj.condition..")
             if client_tuple not in redis_obj.blocked_clients:
                 return '*-1\r\n'  
             print("data fetching and sending from get_blpop_response")
