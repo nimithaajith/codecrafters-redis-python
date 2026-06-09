@@ -85,10 +85,12 @@ async def get_blpop_response(client_tuple) :
                     response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'                                               
                     return response  
         except TimeoutError:
-            if client_tuple in redis_obj.blocked_clients:
-                redis_obj.blocked_clients.remove(client_tuple)
-            print("Timed out")
-            return '*-1\r\n'               
+            async with redis_obj.condition:
+                if client_tuple in redis_obj.blocked_clients:
+                    redis_obj.blocked_clients.remove(client_tuple)
+                    redis_obj.condition.notify_all()
+                print("Timed out")
+                return '*-1\r\n'               
              
     except Exception as e:
         logging.exception("Exception during BLPOP response creation. %s",str(e))
@@ -1227,9 +1229,12 @@ async def client_handler(reader,writer):
             if not CONNECT:
                 break                
     except Exception as e:
-        print("Client handling failed : Error ->",str(e))
-    writer.close()
-    await writer.wait_closed()
+        logging.error("Client handling failed : %s",str(e))
+    finally:
+        if client_addr in transaction_lock.locks:
+            transaction_lock.locks[client_addr].clear()  
+        writer.close()
+        await writer.wait_closed()
 
 
 async def command_propagation_handler():
