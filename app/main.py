@@ -54,6 +54,7 @@ async def blocked_client_handler():
                     
 async def get_blpop_response(client_tuple) :
     try:
+        print("get_blpop_response")
         global RedisAsyncServer
         key =client_tuple[2]
         redis_obj=RedisAsyncServer.data_store[key]
@@ -70,6 +71,7 @@ async def get_blpop_response(client_tuple) :
             ) 
             if client_tuple not in redis_obj.blocked_clients:
                 return '*-1\r\n'  
+            print("data fetching and sending from get_blpop_response")
             value = redis_obj.data.pop(0)
             redis_obj.blocked_clients.popleft()
             redis_obj.condition.notify_all()     
@@ -491,6 +493,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
                     if redis_obj.data_type == 'list':
                         if redis_obj.data:
                             # if data is available , send it to client immediately
+                            print("data is available in BLPOP")
                             async with redis_obj.condition:                        
                                 ele=redis_obj.data.pop(0)
                                 redis_obj.condition.notify_all()
@@ -500,6 +503,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
                             
                         else:
                             # if data is not available add to blocked clients
+                            print("data is available in BLPOP")
                             if waits_for == 0:
                                 expires_on= datetime.max.replace(tzinfo=timezone.utc) # set to infinite datetime
                             else:
