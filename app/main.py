@@ -401,10 +401,10 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
                     response=f'-ERR WRONGTYPE Operation against a key, {key} does not hold a list.'         
                  
             except Exception as e:
-                response=f"-ERR : LPUSH command handling failed {str(e)}\r\n"       
+                response=f"-ERR  LPUSH command handling failed {str(e)}\r\n"       
         else:
             response='-ERR wrong number of arguments'         
-                                                                              
+        print("LPUSH response = ",response)                                                                      
             
     elif data_list[0].upper() == 'RPUSH': 
         if len(data_list) > 2:
