@@ -58,8 +58,12 @@ async def get_blpop_response(client_tuple) :
         global RedisAsyncServer
         key =client_tuple[2]
         redis_obj=RedisAsyncServer.data_store[key]
+        if client_tuple[1] > 0 :
+            timeout = client_tuple[1]
+        else:
+            timeout=None
         try:
-            async with asyncio.timeout(client_tuple[1]):     
+            async with asyncio.timeout(timeout):     
                 async with redis_obj.condition:                           
                     await redis_obj.condition.wait_for(
                         lambda: (client_tuple not in redis_obj.blocked_clients
