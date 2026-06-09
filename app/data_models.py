@@ -1,4 +1,5 @@
 from collections import deque
+import asyncio
 
 class Transaction():
     locks={}
@@ -62,6 +63,7 @@ class RedisObject():
         self.data_type = data_type
         self.last_key=None
         self.blocked_clients=deque() #deque object
+        self.condition = asyncio.Condition()
 
     def add_data(self,data):
         self.data = data

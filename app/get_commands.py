@@ -10,7 +10,6 @@ def geo_search(data_list,data_store):
     try:
         key=data_list[1]
         locations=[]
-        print('GEOSEARCH key =',key)
         if key in data_store  and not key_expired(key,data_store):  
             print('GEOSEARCH key exists')              
             geopos=data_store[key].data 

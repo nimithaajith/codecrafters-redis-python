@@ -35,12 +35,15 @@ async def blocked_client_handler():
             if RedisAsyncServer.data_store:
                 for key in RedisAsyncServer.data_store:
                     if RedisAsyncServer.data_store[key].blocked_clients:
-                        blocked_clients=RedisAsyncServer.data_store[key].blocked_clients                        
+                        blocked_clients=RedisAsyncServer.data_store[key].blocked_clients 
+                        obj=RedisAsyncServer.data_store[key]                       
                         for client_tuple in blocked_clients:
                             try:
                                 _,expires_on,_=client_tuple
                                 if datetime.now(timezone.utc) >= expires_on:
-                                    RedisAsyncServer.data_store[key].blocked_clients.remove(client_tuple)                                                                        
+                                    async with obj.condition:
+                                        obj.blocked_clients.remove(client_tuple)  
+                                    obj.condition.notify_all()                                                                      
                             except Exception as e:
                                 logging.exception("Exception during expired blocked client removal :%s ",str(e))                          
             await asyncio.sleep(0.5)   # check twice per second
@@ -54,20 +57,25 @@ async def get_blpop_response(client_tuple) :
         global RedisAsyncServer
         key =client_tuple[2]
         redis_obj=RedisAsyncServer.data_store[key]
-        SERVERD=False
-        while not SERVERD:
-            if client_tuple in redis_obj.blocked_clients:
-                if client_tuple == redis_obj.blocked_clients[0] and redis_obj.data:
-                    value = redis_obj.data.pop(0)
-                    redis_obj.blocked_clients.popleft()
-                    response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'   
-                    SERVERD=True                                      
-                    return response
-                else:
-                    await asyncio.sleep(0.01)
-            else:
-                response = '*-1\r\n'
-                return response  
+             
+        async with redis_obj.condition:
+            await redis_obj.condition.wait_for(
+                lambda: (client_tuple not in redis_obj.blocked_clients
+                    or (
+                    redis_obj.blocked_clients
+                    and client_tuple == redis_obj.blocked_clients[0]
+                    and redis_obj.data
+                    )
+                )
+            ) 
+            if client_tuple not in redis_obj.blocked_clients:
+                return '*-1\r\n'  
+            value = redis_obj.data.pop(0)
+            redis_obj.blocked_clients.popleft()
+            redis_obj.condition.notify_all()     
+            response=f'*2\r\n${len(key)}\r\n{key}\r\n${len(value)}\r\n{value}\r\n'                                               
+            return response                
+             
     except Exception as e:
         logging.exception("Exception during BLPOP response creation. %s",str(e))
         response=f"-ERR : BLPOP failed due to error - {str(e)}\r\n" 
@@ -225,452 +233,435 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
         response=f"${string_length}\r\n{echo_data}\r\n"  
         
     elif data_list[0].upper() == 'SUBSCRIBE':
-        try:
-            channel_subscriptions=set_commands.subscribe(data_list,writer,client_addr,channel_subscriptions)
-            channels=len(channel_subscriptions[client_addr][0])
-            response=f'*3\r\n$9\r\nsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'
-        except Exception as e:
-            response=f"-ERR : SUBSCRIBE command handling failed {str(e)}\r\n"
+        if len(data_list[1:]) > 0 :
+            try:
+                channel_subscriptions=set_commands.subscribe(data_list,writer,client_addr,channel_subscriptions)
+                channels=len(channel_subscriptions[client_addr][0])
+                response=f'*3\r\n$9\r\nsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'
+            except Exception as e:
+                response=f"-ERR : SUBSCRIBE command handling failed {str(e)}\r\n"
+        else:
+            response='-ERR wrong number of arguments'
     elif data_list[0].upper() == 'UNSUBSCRIBE':
-        try:
-            channel_subscriptions=set_commands.unsubscribe(data_list,client_addr,channel_subscriptions)               
-            channels=len(channel_subscriptions[client_addr][0])
-            response=f'*3\r\n$11\r\nunsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'  
-        except Exception as e:
-            response=f"-ERR : UNSUBSCRIBE command handling failed {str(e)}\r\n"  
+        if len(data_list) > 1 :
+            try:
+                channel_subscriptions=set_commands.unsubscribe(data_list,client_addr,channel_subscriptions)               
+                channels=len(channel_subscriptions[client_addr][0])
+                response=f'*3\r\n$11\r\nunsubscribe\r\n${len(data_list[1])}\r\n{data_list[1]}\r\n:{channels}\r\n'  
+            except Exception as e:
+                response=f"-ERR : UNSUBSCRIBE command handling failed {str(e)}\r\n" 
+        else:
+            response='-ERR wrong number of arguments' 
 
     elif data_list[0].upper() == 'PUBLISH':
-        try:
-            subscribers= await set_commands.publish_message(data_list,channel_subscriptions)        
-            response=f':{subscribers}\r\n'
-        except Exception as e:
-            response=f"-ERR : PUBLISH command handling failed {str(e)}\r\n"  
+        if len(data_list) > 1 :
+            try:
+                subscribers= await set_commands.publish_message(data_list,channel_subscriptions)        
+                response=f':{subscribers}\r\n'
+            except Exception as e:
+                response=f"-ERR : PUBLISH command handling failed {str(e)}\r\n"  
+        else:
+            response='-ERR wrong number of arguments' 
+
     elif data_list[0] == 'KEYS': 
-        try:
-            response= get_commands.get_keys(data_list,RedisAsyncServer.data_store)        
-        except Exception as e:
-            response=f"-ERR : KEYS command handling failed {str(e)}\r\n"  
+        if len(data_list) > 1 :
+            try:
+                response= get_commands.get_keys(data_list,RedisAsyncServer.data_store)        
+            except Exception as e:
+                response=f"-ERR : KEYS command handling failed {str(e)}\r\n"  
+        else:
+            response='-ERR wrong number of arguments' 
+
     elif data_list[0] == 'CONFIG':
-        try:
-            if data_list[1] == 'GET':
-                response= get_commands.config_get(data_list,RedisAsyncServer)  
-        except Exception as e:
-            response=f"-ERR : CONFIG command handling failed {str(e)}\r\n"            
-    elif data_list[0] == 'SET':   
-        try:  
-            key=data_list[1]   
-            RedisAsyncServer.data_store=set_commands.set_key(data_list,RedisAsyncServer.data_store)         
-            modified_key=[key,client_addr]
-            print(f'{server_role} set the new value !!!!')
+        if len(data_list[1:]) > 1 :
+            try:
+                if data_list[1] == 'GET':
+                    response= get_commands.config_get(data_list,RedisAsyncServer)  
+            except Exception as e:
+                response=f"-ERR : CONFIG command handling failed {str(e)}\r\n"  
+        else:
+            response='-ERR wrong number of arguments'          
+    elif data_list[0] == 'SET': 
+        if len(data_list)  > 1 :
+            try:  
+                key=data_list[1]   
+                RedisAsyncServer.data_store=set_commands.set_key(data_list,RedisAsyncServer.data_store)         
+                modified_key=[key,client_addr]
+                print(f'{server_role} set the new value !!!!')
+                if server_role == 'master' :
+                    if RedisAsyncServer.appendfsync == 'always':
+                        try:
+                            utilities.add_command(query_string,RedisAsyncServer)  
+                        except Exception as e:
+                            logging.critical("Appending SET command to AOF by master failed, %s",str(e))              
+                response=f"+OK\r\n"  
+            except Exception as e:
+                response=f"-ERR : SET command handling failed {str(e)}\r\n"  
+        else:
+            response='-ERR wrong number of arguments'         
+        
+    elif data_list[0].upper() == 'WAIT' :
+        if len(data_list[1:]) > 1 :
+            try:
+                if RedisAsyncServer.role == 'master':
+                    if data_list[1].isdigit() and data_list[2].isdigit():
+                        no_of_awaited_replicas = int(data_list[1])
+                        wait_command_timeout = float(data_list[2])
+                        no_of_ack_replicas=0
+                        current_time = datetime.now(timezone.utc)
+                        timeout=current_time+timedelta(milliseconds=wait_command_timeout)
+                        no_of_ack_replicas=await get_ack_replicas(no_of_awaited_replicas,timeout,wait_command_timeout)
+                        print("sending response from WAIT :",no_of_ack_replicas)                
+                        response=f':{no_of_ack_replicas}\r\n' 
+                    else:
+                        response='-ERR value is not an integer'
+            except Exception as e:
+                response=f"-ERR :WAIT command handling failed {str(e)}\r\n"            
+        else:
+            response='-ERR wrong number of arguments'         
+                        
+    elif data_list[0].upper() == 'INCR': 
+        if len(data_list)  > 1:
+            key =data_list[1]
+            response=None
+            if key in RedisAsyncServer.data_store :
+                redis_obj=RedisAsyncServer.data_store[key]
+                try:
+                    float(redis_obj.data)                
+                    new_val = str(int(redis_obj.data)+1)
+                    redis_obj.data = new_val
+                    response =f':{new_val}\r\n'
+                except:
+                    response="-ERR value is not an integer or out of range\r\n"
+            else:
+                RedisAsyncServer.data_store[key] = RedisObject(data = '1',data_type='string') 
+                modified_key=[key,client_addr]
+                response =f':1\r\n'
             if server_role == 'master' :
                 if RedisAsyncServer.appendfsync == 'always':
                     try:
                         utilities.add_command(query_string,RedisAsyncServer)  
                     except Exception as e:
-                        logging.critical("Appending SET command to AOF by master failed, %s",str(e))              
-            response=f"+OK\r\n"  
-        except Exception as e:
-            response=f"-ERR : SET command handling failed {str(e)}\r\n"        
-        
-    elif data_list[0].upper() == 'WAIT' :
-        try:
-            if RedisAsyncServer.role == 'master':
-                no_of_awaited_replicas = int(data_list[1])
-                wait_command_timeout = float(data_list[2])
-                no_of_ack_replicas=0
-                current_time = datetime.now(timezone.utc)
-                timeout=current_time+timedelta(milliseconds=wait_command_timeout)
-                no_of_ack_replicas=await get_ack_replicas(no_of_awaited_replicas,timeout,wait_command_timeout)
-                print("sending response from WAIT :",no_of_ack_replicas)                
-                response=f':{no_of_ack_replicas}\r\n' 
-        except Exception as e:
-            response=f"-ERR :WAIT command handling failed {str(e)}\r\n"            
-                        
-    elif data_list[0].upper() == 'INCR': 
-        key =data_list[1]
-        response=None
-        if key in RedisAsyncServer.data_store :
-            redis_obj=RedisAsyncServer.data_store[key]
-            try:
-                float(redis_obj.data)                
-                new_val = str(int(redis_obj.data)+1)
-                redis_obj.data = new_val
-                response =f':{new_val}\r\n'
-            except:
-                response="-ERR value is not an integer or out of range\r\n"
+                        logging.critical("Appending INCR command to AOF by master failed, %s",str(e))
         else:
-            RedisAsyncServer.data_store[key] = RedisObject(data = '1',data_type='string') 
-            modified_key=[key,client_addr]
-            response =f':1\r\n'
-        if server_role == 'master' :
-            if RedisAsyncServer.appendfsync == 'always':
-                try:
-                    utilities.add_command(query_string,RedisAsyncServer)  
-                except Exception as e:
-                    logging.critical("Appending INCR command to AOF by master failed, %s",str(e))
-        
+            response='-ERR wrong number of arguments'         
+               
     elif data_list[0].upper() == 'GET': 
-        try:
-            key=data_list[1]
-            if key in RedisAsyncServer.data_store.keys() :
-                val=RedisAsyncServer.data_store[key].data
-                val_length=len(val)
-                response=f'${val_length}\r\n{val}\r\n'
-                expiry=RedisAsyncServer.data_store[key].exp
-                if expiry :
-                    if expiry < datetime.now(timezone.utc) :
-                        response = f"$-1\r\n"             
-            else:
-                response=f"$-1\r\n"
-        except Exception as e:
-            response=f"-ERR : GET command handling failed {str(e)}\r\n"        
-        
-        
+        if len(data_list)  > 1:
+            try:
+                key=data_list[1]
+                if key in RedisAsyncServer.data_store.keys() :
+                    val=RedisAsyncServer.data_store[key].data
+                    val_length=len(val)
+                    response=f'${val_length}\r\n{val}\r\n'
+                    expiry=RedisAsyncServer.data_store[key].exp
+                    if expiry :
+                        if expiry < datetime.now(timezone.utc) :
+                            response = f"$-1\r\n"             
+                else:
+                    response=f"$-1\r\n"
+            except Exception as e:
+                response=f"-ERR : GET command handling failed {str(e)}\r\n"        
+        else:
+            response='-ERR wrong number of arguments'         
+                    
     elif data_list[0].upper() == 'LPUSH': 
-        try:
-            key=data_list[1] 
-            new_data_list=data_list[2:]
-            if key not in RedisAsyncServer.data_store.keys() :
-                RedisAsyncServer.data_store[key] = RedisObject(data = [],data_type='list') 
-            redis_obj=RedisAsyncServer.data_store.get(key) 
-            n=len(redis_obj.data)+len(new_data_list)  
-            if new_data_list:
-                for new_data in new_data_list:
-                    redis_obj.data.insert(0,new_data) 
-                modified_key=[key,client_addr]
-            if redis_obj.blocked_clients and redis_obj.data:
-                pass                    
-            response=f':{n}\r\n' 
-        except Exception as e:
-            response=f"-ERR : LPUSH command handling failed {str(e)}\r\n"       
-                                                                          
+        if len(data_list) > 2:
+            try:
+                key=data_list[1] 
+                new_data_list=data_list[2:]
+                if key not in RedisAsyncServer.data_store.keys() :
+                    RedisAsyncServer.data_store[key] = RedisObject(data = [],data_type='list') 
+                redis_obj=RedisAsyncServer.data_store.get(key)
+                if redis_obj.data_type == 'list' :
+                    n=len(redis_obj.data)+len(new_data_list)  
+                    if new_data_list:
+                        async with redis_obj.condition: 
+                            for new_data in new_data_list:
+                                redis_obj.data.insert(0,new_data) 
+                        redis_obj.condition.notify_all()
+                        modified_key=[key,client_addr]
+                                       
+                    response=f':{n}\r\n' 
+                else:
+                    response=f'-ERR WRONGTYPE Operation against a key, {key} does not hold a list.'         
+                 
+            except Exception as e:
+                response=f"-ERR : LPUSH command handling failed {str(e)}\r\n"       
+        else:
+            response='-ERR wrong number of arguments'         
+                                                                              
             
     elif data_list[0].upper() == 'RPUSH': 
-        try:
-            key=data_list[1] 
-            new_data_list=data_list[2:]
-            if key not in RedisAsyncServer.data_store.keys() :
-                RedisAsyncServer.data_store[key] = RedisObject(data = [],data_type='list') 
-            redis_obj=RedisAsyncServer.data_store.get(key) 
-            n=len(redis_obj.data)+len(new_data_list)                   
-            if new_data_list:
-                for new_data in new_data_list:
-                    redis_obj.data.append(new_data) 
-                modified_key=[key,client_addr]            
-            if redis_obj.blocked_clients and redis_obj.data:
-                pass
-            response=f':{n}\r\n'
-        except Exception as e:
-            response=f"-ERR : RPUSH command handling failed {str(e)}\r\n"        
-        
-                                
-    elif data_list[0].upper() == 'LRANGE': 
-        try:
-            key=data_list[1] 
-            start_index=int(data_list[2].strip())
-            stop_index=int(data_list[3].strip())
-            print(">>>start=",start_index,"stop= ",stop_index)                         
-            result_list=None                   
-            if key  in RedisAsyncServer.data_store.keys() :                        
+        if len(data_list) > 2:
+            try:
+                key=data_list[1] 
+                new_data_list=data_list[2:]
+                if key not in RedisAsyncServer.data_store.keys() :
+                    RedisAsyncServer.data_store[key] = RedisObject(data = [],data_type='list') 
                 redis_obj=RedisAsyncServer.data_store.get(key) 
-                existing_list=redis_obj.data
-                n=len(existing_list) 
-                if start_index < 0 and start_index < -n:
-                    start_index = 0                            
-                elif stop_index <0 and stop_index < -n:
-                    stop_index =0                            
-                if start_index <0 and stop_index<0:
-                    start_index=n+start_index
-                    stop_index=n+stop_index                                                      
-                elif start_index >=0 and stop_index < 0:
-                    stop_index = n+stop_index
-                if start_index >= n or start_index > stop_index:
-                    response=f'*0\r\n'
-                elif stop_index >= n:
-                    stop_index=n
-                    result_list=existing_list[start_index:stop_index]
-                else:
-                    stop_index+=1
-                    result_list=existing_list[start_index:stop_index]
-            else:
-                response=f'*0\r\n'
-            if result_list is not None:
-                length=len(result_list)
-                response=f'*{length}\r\n'+'\r\n'.join(f'${len(item)}\r\n{item}' for item in result_list)+f'\r\n'
-        except Exception as e:
-            response=f"-ERR : LRANGE command handling failed {str(e)}\r\n"              
-        
-    elif data_list[0].upper() == 'LLEN': 
-        try:
-        
-            key=data_list[1] 
-            length=0
-            if key in RedisAsyncServer.data_store:
-                redis_obj=RedisAsyncServer.data_store[key]
-                length=len(redis_obj.data)
-                response=f':{length}\r\n'                    
-            else:
-                response=f':0\r\n'
-        except Exception as e:
-            response=f"-ERR : LLEN command handling failed {str(e)}\r\n"              
-            
-    elif data_list[0].upper() == 'BLPOP': 
-        try:
-            key=data_list[1] 
-            waits_for=float(data_list[2]) # in seconds, 0 for infinite
-            if key in RedisAsyncServer.data_store:
-                redis_obj=RedisAsyncServer.data_store[key]
-                if redis_obj.data:
-                    # if data is available , send it to client immediately
-                    ele=redis_obj.data.pop(0)
-                    modified_key=[key,client_addr]
-                    length=len(ele)
-                    response=f'*2\r\n${len(key)}\r\n{key}\r\n${length}\r\n{ele}\r\n' 
-                    print('###RESPONSE TO BLPOP CLIENT###')
-                    print(response)
+                if redis_obj.data_type == 'list' :
+                    n=len(redis_obj.data)+len(new_data_list)                   
+                    if new_data_list:
+                        async with redis_obj.condition: 
+                            for new_data in new_data_list:                            
+                                redis_obj.data.append(new_data) 
+                            redis_obj.condition.notify_all()
+                        modified_key=[key,client_addr]          
                     
+                    response=f':{n}\r\n'
                 else:
-                    # if data is not available add to blocked clients
-                    if waits_for == 0:
-                        expires_on= datetime.max.replace(tzinfo=timezone.utc) # set to infinite datetime
-                    else:
-                        expires_on=datetime.now(timezone.utc) + timedelta(seconds=waits_for)
-                    
-                    client_tuple=tuple((writer,expires_on,key))
-                    redis_obj.blocked_clients.append(client_tuple)                              
-                    print('###add to blocked clients###')
-                    response = await get_blpop_response(client_tuple)
-                                        
-            else:
-                    RedisAsyncServer.data_store[key] = RedisObject(data = [],data_type='list')                             
+                    response=f'-ERR WRONGTYPE Operation against a key, {key} does not hold a list.'         
+                 
+            except Exception as e:
+                response=f"-ERR : RPUSH command handling failed {str(e)}\r\n"        
+        else:
+            response='-ERR wrong number of arguments'         
+                                             
+    elif data_list[0].upper() == 'LRANGE': 
+        if len(data_list) == 4:
+            try:
+                key=data_list[1] 
+                start_index=int(data_list[2].strip())
+                stop_index=int(data_list[3].strip())
+                print(">>>start=",start_index,"stop= ",stop_index)                         
+                result_list=None                   
+                if key  in RedisAsyncServer.data_store.keys() :                        
                     redis_obj=RedisAsyncServer.data_store.get(key) 
-                    if waits_for == 0:
-                        expires_on= datetime.max.replace(tzinfo=timezone.utc) # set to infinite datetime
+                    if redis_obj.data_type == 'list':
+                        existing_list=redis_obj.data
+                        n=len(existing_list) 
+                        if start_index < 0 and start_index < -n:
+                            start_index = 0                            
+                        elif stop_index <0 and stop_index < -n:
+                            stop_index =0                            
+                        if start_index <0 and stop_index<0:
+                            start_index=n+start_index
+                            stop_index=n+stop_index                                                      
+                        elif start_index >=0 and stop_index < 0:
+                            stop_index = n+stop_index
+                        if start_index >= n or start_index > stop_index:
+                            response=f'*0\r\n'
+                        elif stop_index >= n:
+                            stop_index=n
+                            result_list=existing_list[start_index:stop_index]
+                        else:
+                            stop_index+=1
+                            result_list=existing_list[start_index:stop_index]
                     else:
-                        expires_on=datetime.now(timezone.utc) + timedelta(seconds=waits_for)
+                        response=f'-ERR WRONGTYPE Operation against a key, {key} does not hold a list.'         
+                 
+                else:
+                    response=f'*0\r\n'
+                if result_list is not None:
+                    length=len(result_list)
+                    response=f'*{length}\r\n'+'\r\n'.join(f'${len(item)}\r\n{item}' for item in result_list)+f'\r\n'
+            except Exception as e:
+                response=f"-ERR : LRANGE command handling failed {str(e)}\r\n"              
+        else:
+            response='-ERR wrong number of arguments'         
+             
+    elif data_list[0].upper() == 'LLEN': 
+        if len(data_list) == 2:
+            try:        
+                key=data_list[1] 
+                length=0
+                if key in RedisAsyncServer.data_store:
+                    redis_obj=RedisAsyncServer.data_store[key]
+                    if redis_obj.data_type == 'list':
+                        length=len(redis_obj.data)
+                        response=f':{length}\r\n'   
+                    else:
+                        response=f'-ERR WRONGTYPE Operation against a key, {key} does not hold a list.'         
                     
-                    client_tuple=tuple((writer,expires_on,key))
-                    redis_obj.blocked_clients.append(client_tuple)  
-                    response = await get_blpop_response(client_tuple)
+                else:
+                    response=f':0\r\n'
+            except Exception as e:
+                response=f"-ERR : LLEN command handling failed {str(e)}\r\n"              
+        else:
+             response='-ERR wrong number of arguments'         
+                 
+    elif data_list[0].upper() == 'BLPOP': 
+        if len(data_list) > 2:
+            try:
+                key=data_list[1] 
+                waits_for=float(data_list[2]) # in seconds, 0 for infinite
+                if key in RedisAsyncServer.data_store:
+                    redis_obj=RedisAsyncServer.data_store[key]
+                    if redis_obj.data_type == 'list':
+                        if redis_obj.data:
+                            # if data is available , send it to client immediately
+                            async with redis_obj.condition:                        
+                                ele=redis_obj.data.pop(0)
+                                redis_obj.condition.notify_all()
+                                modified_key=[key,client_addr]
+                                length=len(ele)
+                                response=f'*2\r\n${len(key)}\r\n{key}\r\n${length}\r\n{ele}\r\n'                    
+                            
+                        else:
+                            # if data is not available add to blocked clients
+                            if waits_for == 0:
+                                expires_on= datetime.max.replace(tzinfo=timezone.utc) # set to infinite datetime
+                            else:
+                                expires_on=datetime.now(timezone.utc) + timedelta(seconds=waits_for)
+                            
+                            client_tuple=tuple((writer,expires_on,key))
+                            redis_obj.blocked_clients.append(client_tuple)                              
+                            print('###add to blocked clients###')
+                            response = await get_blpop_response(client_tuple)
+                    else:
+                        response=f'-ERR WRONGTYPE Operation against a key, {key} does not hold a list.'         
                     
-            if not writer.is_closing():
-                print('###RESPONSE###')
-                print(response)
-        except Exception as e:
-            response=f"-ERR : BLPOP command handling failed {str(e)}\r\n"              
-            
-    elif data_list[0].upper() == 'LPOP': 
-        try:
-            key=data_list[1] 
-            length=0
-            n=len(data_list)
-            if key in RedisAsyncServer.data_store:
-                redis_obj=RedisAsyncServer.data_store[key]
+
+                else:
+                        RedisAsyncServer.data_store[key] = RedisObject(data = [],data_type='list')                             
+                        redis_obj=RedisAsyncServer.data_store.get(key) 
+                        if waits_for == 0:
+                            expires_on= datetime.max.replace(tzinfo=timezone.utc) # set to infinite datetime
+                        else:
+                            expires_on=datetime.now(timezone.utc) + timedelta(seconds=waits_for)
+                        
+                        client_tuple=tuple((writer,expires_on,key))
+                        redis_obj.blocked_clients.append(client_tuple)  
+                        response = await get_blpop_response(client_tuple)
+                        
                 
-                if redis_obj.data:
-                    if n <3 :
-                        ele=redis_obj.data.pop(0)
-                        length=len(ele)
-                        response=f'${length}\r\n{ele}\r\n'  
-                    elif n>2:
-                        pop_count=int(data_list[2])
-                        if pop_count > len(redis_obj.data):
-                            pop_count=len(redis_obj.data)
-                        popped_elements=[]
-                        #Popping {pop_count} elements
-                        for i in range(pop_count):
-                            popped_elements.append(redis_obj.data.pop(0))
-                        length=len(popped_elements)                        
-                        response=f'*{length}\r\n'+''.join([f'${len(ele)}\r\n{ele}\r\n' for ele in popped_elements])                                                            
-            if length == 0:
-                response=f'$-1\r\n'
-            else:
-                modified_key=[key,client_addr]
-        except Exception as e:
-            response=f"-ERR : LPOP command handling failed {str(e)}\r\n"              
-            
+            except Exception as e:
+                response=f"-ERR : BLPOP command handling failed {str(e)}\r\n"              
+        else:
+             response='-ERR wrong number of arguments'         
+                    
+    elif data_list[0].upper() == 'LPOP': 
+        if len(data_list) == 3:
+            try:
+                key=data_list[1] 
+                length=0
+                n=len(data_list)
+                if key in RedisAsyncServer.data_store:
+                    redis_obj=RedisAsyncServer.data_store[key] 
+                    if redis_obj.data_type == 'list':                   
+                        if redis_obj.data:
+                            if n <3 :
+                                ele=redis_obj.data.pop(0)
+                                length=len(ele)
+                                response=f'${length}\r\n{ele}\r\n'  
+                            elif n>2:
+                                pop_count=int(data_list[2])
+                                if pop_count > len(redis_obj.data):
+                                    pop_count=len(redis_obj.data)
+                                popped_elements=[]
+                                #Popping {pop_count} elements
+                                for i in range(pop_count):
+                                    popped_elements.append(redis_obj.data.pop(0))
+                                length=len(popped_elements)                        
+                                response=f'*{length}\r\n'+''.join([f'${len(ele)}\r\n{ele}\r\n' for ele in popped_elements])                                                            
+                    else:
+                        response=f'-ERR WRONGTYPE Operation against a key, {key} does not hold a list.'         
+                if length == 0:
+                    response=f'$-1\r\n'
+                else:
+                    modified_key=[key,client_addr]
+            except Exception as e:
+                response=f"-ERR : LPOP command handling failed {str(e)}\r\n"              
+        else:
+            response='-ERR wrong number of arguments'                        
         
-    elif data_list[0].upper() == 'XADD': 
-        try:        
-            RedisAsyncServer.data_store,response,AddStream=await set_commands.xadd(data_list,RedisAsyncServer.data_store)
-            if AddStream:
-                key=data_list[1]
-                modified_key=[key,client_addr]
-        except Exception as e:
-            response=f"-ERR : XADD command handling failed {str(e)}\r\n"              
+    elif data_list[0].upper() == 'XADD':
+        if len(data_list) >=5 : 
+            try:        
+                RedisAsyncServer.data_store,response,AddStream=await set_commands.xadd(data_list,RedisAsyncServer.data_store)
+                if AddStream:
+                    key=data_list[1]
+                    modified_key=[key,client_addr]
+            except Exception as e:
+                response=f"-ERR : XADD command handling failed {str(e)}\r\n"              
+        else:
+            response='-ERR wrong number of arguments'                        
             
     elif data_list[0].upper() == 'XRANGE': 
-        try:
-            key=data_list[1] 
-            response=''
-            if key in RedisAsyncServer.data_store.keys():            
-                start=data_list[2]
-                stop=data_list[3]
-                redis_obj = RedisAsyncServer.data_store[key]
-                response=get_xrange_response(redis_obj,start,stop)
-        except Exception as e:
-            response=f"-ERR : XRANGE command handling failed {str(e)}\r\n"     
-            
+        if len(data_list) >= 4 :
+            try:
+                key=data_list[1] 
+                response=''
+                if key in RedisAsyncServer.data_store.keys():            
+                    start=data_list[2]
+                    stop=data_list[3]
+                    redis_obj = RedisAsyncServer.data_store[key]
+                    if redis_obj.data_type == 'stream' :
+                        response=get_xrange_response(redis_obj,start,stop)
+                    else:
+                        response = response=f'-ERR WRONGTYPE Operation against a key, {key} does not hold a stream.' 
+            except Exception as e:
+                response=f"-ERR : XRANGE command handling failed {str(e)}\r\n"     
+        else:
+            response='-ERR wrong number of arguments'    
                     
     elif data_list[0].upper() == 'XREAD': 
-        try:
-            if data_list[1].upper() == 'STREAMS':
-                response= get_commands.xread_streams(data_list,RedisAsyncServer.data_store)
-                                            
-            elif data_list[1].upper() == 'BLOCK' and data_list[3].upper() == 'STREAMS':
-                block_ms=float(data_list[2])
-                key=data_list[4] 
-                stream_key=data_list[5] 
-                xread_stream_block=True
-                if key in RedisAsyncServer.data_store:
-                    response=f'*1\r\n'
-                    redis_obj =RedisAsyncServer.data_store[key]
-                    if stream_key != '$':
-                        key_response,data_len=get_xread_response(key,redis_obj,stream_key)
-                        if data_len > 0:
-                            print('$$$$$$data_list[2]=',data_list[2],' ; got response =',key_response)
-                            response = response + key_response 
-                            xread_stream_block=False
-                    else:
-                        stream_key=redis_obj.last_key
-                if xread_stream_block:
-                    #push to waiting queue and wait
-                    if data_list[2].strip() == '0':
-                        print("####INFINITE WAIT#####",client_addr)
-                        expires_on= datetime.max.replace(tzinfo=timezone.utc) # set to infinite datetime
-                    else:
-                        expires_on = datetime.now(timezone.utc)+timedelta(milliseconds=block_ms)
-                    xread_stream_block_que[key].append(client_addr)
-                    try:
-                        block_response,block_expired=await xread_stream_block_handler(key,stream_key,expires_on,client_addr)
-                        if not block_expired:
-                            response=f'*1\r\n'+block_response
+        if len(data_list) >= 4 :
+            try:
+                if data_list[1].upper() == 'STREAMS':
+                    response= get_commands.xread_streams(data_list,RedisAsyncServer.data_store)
+                                                
+                elif data_list[1].upper() == 'BLOCK' and data_list[3].upper() == 'STREAMS':
+                    block_ms=float(data_list[2])
+                    key=data_list[4] 
+                    stream_key=data_list[5] 
+                    xread_stream_block=True
+                    if key in RedisAsyncServer.data_store:
+                        response=f'*1\r\n'
+                        redis_obj =RedisAsyncServer.data_store[key]
+                        if stream_key != '$':
+                            key_response,data_len=get_xread_response(key,redis_obj,stream_key)
+                            if data_len > 0:
+                                print('$$$$$$data_list[2]=',data_list[2],' ; got response =',key_response)
+                                response = response + key_response 
+                                xread_stream_block=False
                         else:
-                            response=block_response  
-                    except RuntimeError as e:
-                        response=f"-ERR : XREAD block handling failed, RuntimeError {str(e)}\r\n"
-                    except Exception as e:
-                        response=f"-ERR : XREAD block handling failed, Exception {str(e)}\r\n"            
-                         
-             
-        except Exception as e:
-            response=f"-ERR : XREAD command handling failed,Exception {str(e)}\r\n"             
-                   
+                            stream_key=redis_obj.last_key
+                    if xread_stream_block:
+                        #push to waiting queue and wait
+                        if data_list[2].strip() == '0':
+                            print("####INFINITE WAIT#####",client_addr)
+                            expires_on= datetime.max.replace(tzinfo=timezone.utc) # set to infinite datetime
+                        else:
+                            expires_on = datetime.now(timezone.utc)+timedelta(milliseconds=block_ms)
+                        xread_stream_block_que[key].append(client_addr)
+                        try:
+                            block_response,block_expired=await xread_stream_block_handler(key,stream_key,expires_on,client_addr)
+                            if not block_expired:
+                                response=f'*1\r\n'+block_response
+                            else:
+                                response=block_response  
+                        except RuntimeError as e:
+                            response=f"-ERR : XREAD block handling failed, RuntimeError {str(e)}\r\n"
+                        except Exception as e:
+                            response=f"-ERR : XREAD block handling failed, Exception {str(e)}\r\n"            
+            except Exception as e:
+                response=f"-ERR : XREAD command handling failed,Exception {str(e)}\r\n"             
+        else :
+            response='-ERR wrong number of arguments'   
+
     elif data_list[0].upper() == 'ZADD':
-        try:
-            # ZADD racer_scores 8.0 "Sam"
-            print('data_list =', data_list)
-            key=data_list[1]
-            score=float(data_list[2])
-            member = data_list[3]
-            response=None
-            score_list=list((score,member))            
-            if key not in RedisAsyncServer.data_store:
-                new_redis_object = RedisObject(data=[],data_type='sortedset')
-                updated_data=[]
-                updated_data.append(score_list)                
-                RedisAsyncServer.data_store[key] = new_redis_object            
-            else:
-                memberExists = False
-                old_data = RedisAsyncServer.data_store[key].data
-                for l in old_data:
-                    if l[1] == member :
-                        updated_data = old_data 
-                        updated_data.remove(l)
-                        updated_data.append(score_list)                        
-                        response=':0\r\n' 
-                        memberExists = True                      
-                        break
-                if not memberExists:
-                    updated_data=RedisAsyncServer.data_store[key].data 
-                    updated_data.append(score_list)            
-            new_sorted_data  = sorted(updated_data,key=lambda x : (x[0],x[1])) 
-            print("new data = ",new_sorted_data)
-            RedisAsyncServer.data_store[key].data =new_sorted_data  
-            modified_key=[key,client_addr]
-            if response is None:
-                response=':1\r\n' 
-        except Exception as e:
-            response=f"-ERR : ZADD command handling failed {str(e)}\r\n"              
-            
-    elif data_list[0].upper() == 'ZRANK':
-        try:
-            # ZRANK zset_key member
-            response=get_commands.get_zrank(data_list,RedisAsyncServer.data_store)  
-        except Exception as e:
-            response=f"-ERR : ZRANK command handling failed {str(e)}\r\n"    
-                     
-        
-    elif data_list[0].upper() == 'ZRANGE' :
-        try:
-            # ZRANGE racer_scores 0 2
-            response=get_commands.get_zrange(data_list,RedisAsyncServer.data_store)
-        except Exception as e:
-            response=f"-ERR : ZRANGE command handling failed {str(e)}\r\n"           
-        
-    elif data_list[0].upper() == 'ZCARD' :
-        try:
-            # ZCARD zset_key
-            response=get_commands.get_zcard(data_list,RedisAsyncServer.data_store)
-        except Exception as e:
-            response=f"-ERR : ZCARD command handling failed {str(e)}\r\n"       
-            
-            
-    elif data_list[0].upper() == 'ZSCORE' :
-        try:
-            # ZSCORE zset_key member
-            response = get_commands.get_zscore(data_list,RedisAsyncServer.data_store)
-            
-            print("zscore response = ",response)
-        except Exception as e:
-            response=f"-ERR : ZSCORE command handling failed {str(e)}\r\n"              
-            
-    elif data_list[0].upper() == 'ZREM' :
-        try:
-            # ZREM zset_key member
-            key = data_list[1]
-            member=data_list[2]
-            if key not in RedisAsyncServer.data_store :
-                response = ":0\r\n" 
-            else:
-                is_member = False
-                old_data = RedisAsyncServer.data_store[key].data
-                for l in old_data:
-                    if l[1] == member : 
-                        old_data.remove(l) 
-                        RedisAsyncServer.data_store[key].data =old_data  
-                        modified_key=[key,client_addr]                                                                
-                        response=':1\r\n' 
-                        is_member = True                      
-                        break
-                if not is_member:
-                    response = ':0\r\n'
-        except Exception as e:
-            response=f"-ERR : ZREM command handling failed {str(e)}\r\n"              
-            
-    elif data_list[0].upper() == 'GEOADD':
-    #GEOADD key longitude latitude placename  
-        try:
-            key=data_list[1]
-            longitude=float(data_list[2])
-            latitude=float(data_list[3]) 
-            placename=data_list[4]
-            response=None
-            if longitude < -180 or longitude > 180 or latitude < -85.05112878 or latitude > 85.05112878 :
-                response=f'-ERR invalid longitude,latitude pair {longitude},{latitude}\r\n'
-            else:            
-                geoscore= geo_encode.encode(latitude=latitude,longitude=longitude)
-                score_list=list((geoscore,placename))            
+        # sorted set
+        if len(data_list) >= 4 :
+            try:
+                # ZADD racer_scores 8.0 "Sam"
+                print('data_list =', data_list)
+                key=data_list[1]
+                score=float(data_list[2])
+                member = data_list[3]
+                response=None
+                score_list=list((score,member))            
                 if key not in RedisAsyncServer.data_store:
                     new_redis_object = RedisObject(data=[],data_type='sortedset')
                     updated_data=[]
                     updated_data.append(score_list)                
-                    RedisAsyncServer.data_store[key] = new_redis_object                
+                    RedisAsyncServer.data_store[key] = new_redis_object            
                 else:
                     memberExists = False
                     old_data = RedisAsyncServer.data_store[key].data
                     for l in old_data:
-                        if l[1] == placename :
+                        if l[1] == member :
                             updated_data = old_data 
                             updated_data.remove(l)
                             updated_data.append(score_list)                        
@@ -679,104 +670,236 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
                             break
                     if not memberExists:
                         updated_data=RedisAsyncServer.data_store[key].data 
-                        updated_data.append(score_list)
-                
+                        updated_data.append(score_list)            
                 new_sorted_data  = sorted(updated_data,key=lambda x : (x[0],x[1])) 
                 print("new data = ",new_sorted_data)
                 RedisAsyncServer.data_store[key].data =new_sorted_data  
                 modified_key=[key,client_addr]
                 if response is None:
                     response=':1\r\n' 
-        except Exception as e:
-            response=f"-ERR : GEOADD command handling failed {str(e)}\r\n"              
+            except Exception as e:
+                response=f"-ERR : ZADD command handling failed {str(e)}\r\n"              
+        else:
+            response='-ERR wrong number of arguments'     
+
+    elif data_list[0].upper() == 'ZRANK':
+        if len(data_list) >= 3:            
+            try:
+                # ZRANK zset_key member
+                response=get_commands.get_zrank(data_list,RedisAsyncServer.data_store)  
+            except Exception as e:
+                response=f"-ERR : ZRANK command handling failed {str(e)}\r\n"    
+        else:
+            response='-ERR wrong number of arguments'              
+        
+    elif data_list[0].upper() == 'ZRANGE' :
+        if len(data_list) >= 4:
+            try:
+                # ZRANGE racer_scores 0 2
+                response=get_commands.get_zrange(data_list,RedisAsyncServer.data_store)
+            except Exception as e:
+                response=f"-ERR : ZRANGE command handling failed {str(e)}\r\n"           
+        else:
+            response='-ERR wrong number of arguments'              
             
+    elif data_list[0].upper() == 'ZCARD' :
+        if len(data_list) ==2 :
+            try:
+                # ZCARD zset_key
+                response=get_commands.get_zcard(data_list,RedisAsyncServer.data_store)
+            except Exception as e:
+                response=f"-ERR : ZCARD command handling failed {str(e)}\r\n"       
+        else:
+            response='-ERR wrong number of arguments'              
+                    
+            
+    elif data_list[0].upper() == 'ZSCORE' :
+        if len(data_list) == 3 :
+            try:
+                # ZSCORE zset_key member
+                response = get_commands.get_zscore(data_list,RedisAsyncServer.data_store)
+                
+                print("zscore response = ",response)
+            except Exception as e:
+                response=f"-ERR : ZSCORE command handling failed {str(e)}\r\n"              
+        else:
+            response='-ERR wrong number of arguments'              
+                
+    elif data_list[0].upper() == 'ZREM' :
+        if len(data_list) >= 3 :
+            try:
+                # ZREM zset_key member
+                key = data_list[1]
+                member=data_list[2]
+                if key not in RedisAsyncServer.data_store :
+                    response = ":0\r\n" 
+                else:
+                    is_member = False
+                    old_data = RedisAsyncServer.data_store[key].data
+                    for l in old_data:
+                        if l[1] == member : 
+                            old_data.remove(l) 
+                            RedisAsyncServer.data_store[key].data =old_data  
+                            modified_key=[key,client_addr]                                                                
+                            response=':1\r\n' 
+                            is_member = True                      
+                            break
+                    if not is_member:
+                        response = ':0\r\n'
+            except Exception as e:
+                response=f"-ERR : ZREM command handling failed {str(e)}\r\n"              
+        else:
+            response='-ERR wrong number of arguments'              
+                 
+    elif data_list[0].upper() == 'GEOADD':
+    #GEOADD key longitude latitude placename 
+        if len(data_list) >= 5 : 
+            try:
+                key=data_list[1]
+                longitude=float(data_list[2])
+                latitude=float(data_list[3]) 
+                placename=data_list[4]
+                response=None
+                if longitude < -180 or longitude > 180 or latitude < -85.05112878 or latitude > 85.05112878 :
+                    response=f'-ERR invalid longitude,latitude pair {longitude},{latitude}\r\n'
+                else:            
+                    geoscore= geo_encode.encode(latitude=latitude,longitude=longitude)
+                    score_list=list((geoscore,placename))            
+                    if key not in RedisAsyncServer.data_store:
+                        new_redis_object = RedisObject(data=[],data_type='sortedset')
+                        updated_data=[]
+                        updated_data.append(score_list)                
+                        RedisAsyncServer.data_store[key] = new_redis_object                
+                    else:
+                        memberExists = False
+                        old_data = RedisAsyncServer.data_store[key].data
+                        for l in old_data:
+                            if l[1] == placename :
+                                updated_data = old_data 
+                                updated_data.remove(l)
+                                updated_data.append(score_list)                        
+                                response=':0\r\n' 
+                                memberExists = True                      
+                                break
+                        if not memberExists:
+                            updated_data=RedisAsyncServer.data_store[key].data 
+                            updated_data.append(score_list)
+                    
+                    new_sorted_data  = sorted(updated_data,key=lambda x : (x[0],x[1])) 
+                    print("new data = ",new_sorted_data)
+                    RedisAsyncServer.data_store[key].data =new_sorted_data  
+                    modified_key=[key,client_addr]
+                    if response is None:
+                        response=':1\r\n' 
+            except Exception as e:
+                response=f"-ERR : GEOADD command handling failed {str(e)}\r\n"              
+        else:
+            response='-ERR wrong number of arguments'            
 
     elif data_list[0].upper() == 'GEOPOS' :
-        try:
-            # GEOPOS key member1 member2
-            response = get_commands.geo_position(data_list,RedisAsyncServer.data_store)
-        except Exception as e:
-            response=f"-ERR : GEOPOS command handling failed {str(e)}\r\n"                      
-
+        if len(data_list) >= 3:
+            try:
+                # GEOPOS key member1 member2
+                response = get_commands.geo_position(data_list,RedisAsyncServer.data_store)
+            except Exception as e:
+                response=f"-ERR : GEOPOS command handling failed {str(e)}\r\n"                      
+        else:
+            response='-ERR wrong number of arguments' 
     elif data_list[0].upper() == 'GEODIST' :
-        try:
-            # GEODIST places Munich Paris  , 
-            response = get_commands.geo_dist(data_list,RedisAsyncServer.data_store)  
-        except Exception as e:
-            response=f"-ERR : GEODIST command handling failed {str(e)}\r\n"              
-                      
+        if len(data_list) >= 4 :
+            try:
+                # GEODIST places Munich Paris  , 
+                response = get_commands.geo_dist(data_list,RedisAsyncServer.data_store)  
+            except Exception as e:
+                response=f"-ERR : GEODIST command handling failed {str(e)}\r\n"              
+        else:
+            response='-ERR wrong number of arguments'                 
         
     elif data_list[0].upper() == 'GEOSEARCH' :
-        try:
-            # GEOSEARCH key FROMLONLAT longitude latitude BYRADIUS radius unit(m) 
-            response =  get_commands.geo_search(data_list,RedisAsyncServer.data_store) 
-        except Exception as e:
-            response=f"-ERR : GEOSEARCH command handling failed {str(e)}\r\n"                  
-
-    elif data_list[0].upper() == 'ACL':
-        response=''
-        try:            
-            current_users=RedisAsyncServer.clients
-            if data_list[1].upper() == 'WHOAMI':            
-                response = '$7\r\ndefault\r\n'
-                print("inside whoam i, response =",response)
-            elif data_list[1].upper() == 'GETUSER':
-                response = get_commands.get_user(data_list,current_users)            
-            elif data_list[1].upper() == 'SETUSER':
-                # ACL SETUSER default >mypassword
-                user_name=data_list[2]
-                exception_raised=False
-                if data_list[3].startswith('>'):
-                    raw_password=str(data_list[3]).lstrip('>')                
-                    for user in current_users:
-                        if user.username == user_name:
-                            RedisAsyncServer.clients.remove(user)
-                            try:
-                                # user.password = hashing.scrypt_hashing(raw_password)
-                                user.password = hashing.hash_password(raw_password)
-                                flags=user.flags
-                                if 'nopass' in flags:
-                                    user.flags.remove('nopass') 
-                                RedisAsyncServer.clients.append(user)                             
-                                
-                            except Exception as e:
-                                response=f"-ERR : Password handling failed {str(e)}\r\n"
-                                exception_raised=True
-                                break                
-        except Exception as e:
-            response=f"-ERR : ACL command handling failed {str(e)}\r\n"  
-            print("exception =",str(e)) 
-            exception_raised=True        
-        if not response:
-            response='+OK\r\n'
-        print("whoami response = ",response)            
-    elif data_list[0].upper() == 'AUTH':
-        try:
-            #AUTH <username> <password>
-            user_name=data_list[1]
-            user_pass=data_list[2]
-            response='-WRONGPASS invalid username-password pair or user is disabled.\r\n'            
-            for user in RedisAsyncServer.clients:
-                if user.username == user_name:
-                    # if hashing.verify_scrypt_hashing(str(user_pass),user.password) :
-                    if hashing.hash_password(str(user_pass)).lower() == user.password.lower() :
-                        response='+OK\r\n'
-                        if not utilities.client_exists(RedisAsyncServer.clients,client_addr):
-                            RedisAsyncServer.clients=utilities.add_client(user_name,RedisAsyncServer.clients,client_addr)
-                        break  
-        except ValueError:
-            response=f"-ERR : AUTH command handling failed ,Stored hash format invalid.\r\n"  
-        except RuntimeError:
-            response=f"-ERR : AUTH command handling failed ,password hashing failed.\r\n"  
-        except Exception as e:
-            response=f"-ERR : AUTH command handling failed {str(e)}\r\n"                            
-
-    elif data_list[0] == 'TYPE': 
-        try:
-            response =  get_commands.get_type(data_list,RedisAsyncServer.data_store) 
-        except Exception as e:
-            response=f"-ERR : TYPE command handling failed {str(e)}\r\n"                   
+        if len(data_list) >= 7 :
+            try:
+                # GEOSEARCH key FROMLONLAT longitude latitude BYRADIUS radius unit(m) 
+                if data_list[2].upper() == 'FROMLONLAT':
+                    response =  get_commands.geo_search(data_list,RedisAsyncServer.data_store) 
+            except Exception as e:
+                response=f"-ERR : GEOSEARCH command handling failed {str(e)}\r\n"                  
+        else:
+            response='-ERR wrong number of arguments'                 
         
+    elif data_list[0].upper() == 'ACL':
+        if len(data_list) >= 2:
+            response=''
+            try:            
+                current_users=RedisAsyncServer.clients
+                if data_list[1].upper() == 'WHOAMI':            
+                    response = '$7\r\ndefault\r\n'
+                    print("inside whoam i, response =",response)
+                elif data_list[1].upper() == 'GETUSER':
+                    response = get_commands.get_user(data_list,current_users)            
+                elif data_list[1].upper() == 'SETUSER':
+                    # ACL SETUSER default >mypassword
+                    user_name=data_list[2]
+                    exception_raised=False
+                    if data_list[3].startswith('>'):
+                        raw_password=str(data_list[3]).lstrip('>')                
+                        for user in current_users:
+                            if user.username == user_name:
+                                RedisAsyncServer.clients.remove(user)
+                                try:
+                                    # user.password = hashing.scrypt_hashing(raw_password)
+                                    user.password = hashing.hash_password(raw_password)
+                                    flags=user.flags
+                                    if 'nopass' in flags:
+                                        user.flags.remove('nopass') 
+                                    RedisAsyncServer.clients.append(user)                             
+                                    
+                                except Exception as e:
+                                    response=f"-ERR : Password handling failed {str(e)}\r\n"
+                                    exception_raised=True
+                                    break                
+            except Exception as e:
+                response=f"-ERR : ACL command handling failed {str(e)}\r\n"  
+                print("exception =",str(e)) 
+                exception_raised=True        
+            if not response:
+                response='+OK\r\n'
+            print("whoami response = ",response)   
+        else:
+            response='-ERR wrong number of arguments'                 
+                 
+    elif data_list[0].upper() == 'AUTH':
+        if len(data_list) == 3 :
+            try:
+                #AUTH <username> <password>
+                user_name=data_list[1]
+                user_pass=data_list[2]
+                response='-WRONGPASS invalid username-password pair or user is disabled.\r\n'            
+                for user in RedisAsyncServer.clients:
+                    if user.username == user_name:
+                        # if hashing.verify_scrypt_hashing(str(user_pass),user.password) :
+                        if hashing.hash_password(str(user_pass)).lower() == user.password.lower() :
+                            response='+OK\r\n'
+                            if not utilities.client_exists(RedisAsyncServer.clients,client_addr):
+                                RedisAsyncServer.clients=utilities.add_client(user_name,RedisAsyncServer.clients,client_addr)
+                            break  
+            except ValueError:
+                response=f"-ERR : AUTH command handling failed ,Stored hash format invalid.\r\n"  
+            except RuntimeError:
+                response=f"-ERR : AUTH command handling failed ,password hashing failed.\r\n"  
+            except Exception as e:
+                response=f"-ERR : AUTH command handling failed {str(e)}\r\n"                            
+        else:
+            response='-ERR wrong number of arguments'                 
+             
+    elif data_list[0] == 'TYPE': 
+        if len(data_list) == 2:
+            try:
+                response =  get_commands.get_type(data_list,RedisAsyncServer.data_store) 
+            except Exception as e:
+                response=f"-ERR : TYPE command handling failed {str(e)}\r\n"                   
+        else:
+            response='-ERR wrong number of arguments'                 
+                 
     if modified_key:
         print("calling check and update lock")
         check_and_update_locks(modified_key) 
@@ -849,8 +972,7 @@ async def client_handler(reader,writer):
             # line1=await reader.readline()            
             if not query_string or not data_list:
                 await asyncio.sleep(0.2)
-                continue
-           
+                continue           
             
             print('#####PROCESSING QUERY #########')
             print(query_string) 
@@ -976,30 +1098,30 @@ async def client_handler(reader,writer):
                             
                         else:
                             response =f'*{que_length}\r\n'
-                            while len(MULTI[1]) > 0 :                            
-                                query_string=MULTI[1].popleft()
-                                input_tokens=query_string.splitlines() 
-                                input_tokens_list=[]                                
-                                cmd_parsed=True
-                                cmd_length=0
-                                if input_tokens[0] and input_tokens[0].startswith('*'):                                    
-                                    cmd_length=int(input_tokens[0][1:])
-                                else: 
-                                    cmd_parsed=False
-                                if cmd_length:                          
-                                    i=1                                    
-                                    while i < len(input_tokens):                                    
-                                        part=input_tokens[i]
-                                        if part and part.startswith('$'): 
-                                            inp_str=input_tokens[i+1]
-                                            input_tokens_list.append(inp_str) 
-                                            i=i+2
-                                        else:
-                                            cmd_parsed=False
-                                            break                                 
-                                else:
-                                    cmd_parsed=False
-                                if cmd_parsed:
+                            while len(MULTI[1]) > 0 :                                                            
+                                query_string,input_tokens_list=MULTI[1].popleft()
+                                # input_tokens=query_string.splitlines() 
+                                # input_tokens_list=[]                                
+                                # cmd_parsed=True
+                                # cmd_length=0
+                                # if input_tokens[0] and input_tokens[0].startswith('*'):                                    
+                                #     cmd_length=int(input_tokens[0][1:])
+                                # else: 
+                                #     cmd_parsed=False
+                                # if cmd_length:                          
+                                #     i=1                                    
+                                #     while i < len(input_tokens):                                    
+                                #         part=input_tokens[i]
+                                #         if part and part.startswith('$'): 
+                                #             inp_str=input_tokens[i+1]
+                                #             input_tokens_list.append(inp_str) 
+                                #             i=i+2
+                                #         else:
+                                #             cmd_parsed=False
+                                #             break                                 
+                                # else:
+                                #     cmd_parsed=False
+                                if input_tokens_list:
                                     cmd_response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,input_tokens_list)
                                     response = response+ f'{cmd_response}'
                             writer.write(response.encode())
@@ -1016,7 +1138,7 @@ async def client_handler(reader,writer):
                         transaction_lock.locks[client_addr].clear()
                     else:
                         print('status = multi enabled,not EXEC')
-                        MULTI[1].append(query_string)
+                        MULTI[1].append([query_string,data_list])
                         response=f"+QUEUED\r\n"
                     writer.write(response.encode())
                     await writer.drain() 
