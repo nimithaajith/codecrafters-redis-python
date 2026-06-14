@@ -11,12 +11,10 @@ def geo_search(data_list,data_store):
         key=data_list[1]
         locations=[]
         if key in data_store  and not key_expired(key,data_store):  
-            print('GEOSEARCH key exists')              
             geopos=data_store[key].data 
             center_long = float(data_list[3])
             center_lat= float(data_list[4])
             radius=float(data_list[6])
-            print("Radius = ",radius)
             unit=data_list[7]
             conv=1
             if unit == 'km':
@@ -27,19 +25,18 @@ def geo_search(data_list,data_store):
             for score,place in geopos:
                 lat,long=geo_decode.decode(int(score))
                 dist=  distance.haversine( lat, long,center_lat, center_long)
-                print(f">>>>>>distance for place {place} = {dist}")
                 if (dist * conv) <= radius :
                     locations.append(place)
             if locations :
-                response=f'*{len(locations)}\r\n'+''.join(f'${len(l)}\r\n{l}\r\n' for l in locations)
+                response=f'*{len(locations)}\r\n'+''.join(f'${len(l.encode())}\r\n'.encode()+l.encode()+b'\r\n' for l in locations)
             else:
-                response=f'*0\r\n'
+                response=b'*0\r\n'
         else:
-            response=f'*0\r\n'
+            response=b'*0\r\n'
     except RuntimeError as e:
-        response=f"-ERR : GEO SEARCH failed ,{str(e)}.\r\n"  
+        response=f"-ERR : GEO SEARCH failed ,{str(e)}.\r\n".encode() 
     except Exception as e:
-        response=f"-ERR : GEO SEARCH failed , {str(e)}\r\n" 
+        response=f"-ERR : GEO SEARCH failed , {str(e)}\r\n".encode() 
     return response
 
 # GEODIST places Munich Paris  
@@ -56,23 +53,23 @@ def geo_dist(data_list,data_store):
             for score,location in geopos:
                 if location in locations:
                     if locations[0] == locations[1]:
-                        response=f'$1\r\n0\r\n'
+                        response=b'$1\r\n0\r\n'
                         break
                     if location == locations[0]:
                         latitude1,longitude1=geo_decode.decode(int(score))
                     elif location == locations[1]:
                         latitude2,longitude2=geo_decode.decode(int(score))            
                 if  latitude1 and longitude1 and latitude2 and longitude2 :
-                    print(latitude1, longitude1,' :::: ',latitude2,longitude2)
-                    dist=  distance.haversine(latitude1, longitude1, latitude2, longitude2)  
-                    response=f'${len(str(dist))}\r\n{str(dist)}\r\n'
+                    dist=  distance.haversine(latitude1, longitude1, latitude2, longitude2) 
+                    dist_bytes=str(dist).encode() 
+                    response=f'${len(dist_bytes)}\r\n'.encode() + dist_bytes + b'\r\n'
                     break  
         else:
-            response = '$-1\r\n'
+            response = b'$-1\r\n'
     except RuntimeError as e:
-        response=f"-ERR : GEO DIST failed ,{str(e)}.\r\n"  
+        response=f"-ERR : GEO DIST failed ,{str(e)}.\r\n".encode()  
     except Exception as e:
-        response=f"-ERR : GEO DIST failed , {str(e)}\r\n" 
+        response=f"-ERR : GEO DIST failed , {str(e)}\r\n".encode() 
     return response
     
 # GEOPOS key member1 member2
@@ -81,7 +78,7 @@ def geo_position(data_list,data_store):
         key=data_list[1]
         members=data_list[2:]
         m_len=len(members)
-        response=f'*{m_len}\r\n'
+        response=f'*{m_len}\r\n'.encode()
         if key in data_store and not key_expired(key,data_store):                
             geopos=data_store[key].data                
             for query_member in members:
@@ -91,17 +88,19 @@ def geo_position(data_list,data_store):
                         latitude,longitude=geo_decode.decode(int(score))
                         la=str(latitude)
                         lo=str(longitude)
-                        response=response + f'*2\r\n${len(lo)}\r\n{lo}\r\n${len(la)}\r\n{la}\r\n'
+                        la_bytes=la.encode()
+                        lo_bytes=lo.encode()
+                        response=response + f'*2\r\n${len(lo_bytes)}\r\n'.encode() + lo_bytes + f'\r\n${len(la_bytes)}\r\n'.encode() + la_bytes + b'\r\n'
                         is_member=True
                         break
                 if not is_member:
-                    response=response + '*-1\r\n'
+                    response=response + b'*-1\r\n'
         else:
-            response=response + ''.join('*-1\r\n' for _ in range(m_len))
+            response=response + ''.join(b'*-1\r\n' for _ in range(m_len))
     except RuntimeError as e:
-        response=f"-ERR : GEO POSITION failed ,{str(e)}.\r\n"  
+        response=f"-ERR : GEO POSITION failed ,{str(e)}.\r\n".encode()  
     except Exception as e:
-        response=f"-ERR : GEO POSITION failed , {str(e)}\r\n" 
+        response=f"-ERR : GEO POSITION failed , {str(e)}\r\n".encode() 
     
     return response
 
@@ -113,22 +112,23 @@ def get_zscore(data_list,data_store):
         key = data_list[1]
         member=data_list[2]
         if key not in data_store or key_expired(key,data_store) :
-            response = "$-1\r\n" 
+            response = b"$-1\r\n" 
         else:
             is_member = False
             old_data = data_store[key].data
             for l in old_data:
                 if l[1] == member : 
-                    scr_str=str(l[0])                                                                    
-                    response=f'${len(scr_str)}\r\n{scr_str}\r\n' 
+                    scr_str=str(l[0]) 
+                    scr_bytes=  scr_str.encode()                                                                 
+                    response=f'${len(scr_bytes)}\r\n'.encode()+scr_bytes+b'\r\n' 
                     is_member = True                      
                     break
             if not is_member:
-                response = '$-1\r\n'
+                response = b'$-1\r\n'
     except RuntimeError as e:
-        response=f"-ERR : Getting zscore failed ,{str(e)}.\r\n"  
+        response=f"-ERR : Getting zscore failed ,{str(e)}.\r\n".encode()  
     except Exception as e:
-        response=f"-ERR : Getting zscore  failed , {str(e)}\r\n" 
+        response=f"-ERR : Getting zscore  failed , {str(e)}\r\n".encode() 
     
     return response  
 
@@ -155,7 +155,6 @@ def get_zrange(data_list,data_store) :
         key=data_list[1]
         start_inx=int(data_list[2])
         end_inx=int(data_list[3])
-        print(f"zrange[{key}] : [{start_inx} : {end_inx}]")
         slice = True
         if key not in data_store or key_expired(key,data_store):
             response = '*0\r\n' 
@@ -186,9 +185,7 @@ def get_zrange(data_list,data_store) :
                     else: 
                         start_inx = start_inx +total_len
                 
-                print("zrange slicing = ",start_inx,end_inx+1)
                 sliced_set= scores[start_inx : end_inx+1]
-                print("zrange sliced_set = ",sliced_set)
                 response=f'*{len(sliced_set)}\r\n'
                 response=response+''.join(f'${len(l[1])}\r\n{l[1]}\r\n' for l in sliced_set) 
     except RuntimeError as e:
@@ -230,25 +227,27 @@ def config_get(data_list,RedisAsyncServer):
     if data_list[2].lower() == 'dir':
         rdb_dir=RedisAsyncServer.rdb_dir
         if rdb_dir is not None:
-            response=f'*2\r\n$3\r\ndir\r\n${len(rdb_dir)}\r\n{rdb_dir}\r\n'
+            rdb_dir_bytes=rdb_dir.encode()
+            response=f'*2\r\n$3\r\ndir'.encode()+f'\r\n${len(rdb_dir_bytes)}\r\n'.encode()+rdb_dir_bytes+b'\r\n'
         else:
             path=RedisAsyncServer.dir
-            response=f'*2\r\n$3\r\ndir\r\n${len(path)}\r\n{path}\r\n'
+            path_bytes=path.encode()
+            response=f'*2\r\n$3\r\ndir\r\n${len(path_bytes)}\r\n'.encode()+path_bytes+b'\r\n'
     elif data_list[2].lower() == 'dbfilename':
         rdb_filename=RedisAsyncServer.rdb_filename
-        response=f'*2\r\n$10\r\ndbfilename\r\n${len(rdb_filename)}\r\n{rdb_filename}\r\n'
+        response=f'*2\r\n$10\r\ndbfilename\r\n${len(rdb_filename.encode())}\r\n'.encode()+rdb_filename.encode()+b'\r\n'
     elif data_list[2].lower() == 'appendonly':
         aof_status=RedisAsyncServer.appendonly
-        response=f'*2\r\n$10\r\nappendonly\r\n${len(aof_status)}\r\n{aof_status}\r\n'
+        response=f'*2\r\n$10\r\nappendonly\r\n${len(aof_status.encode())}\r\n'.encode()+aof_status.encode()+b'\r\n'
     elif data_list[2].lower() == 'appenddirname':
         appenddir=RedisAsyncServer.appenddirname
-        response=f'*2\r\n$13\r\nappenddirname\r\n${len(appenddir)}\r\n{appenddir}\r\n'
+        response=f'*2\r\n$13\r\nappenddirname\r\n${len(appenddir.encode())}\r\n'.encode()+appenddir.encode()+b'\r\n'
     elif data_list[2].lower() == 'appendfilename':
         appendfile=RedisAsyncServer.appendfilename
-        response=f'*2\r\n$14\r\nappendfilename\r\n${len(appendfile)}\r\n{appendfile}\r\n'
+        response=f'*2\r\n$14\r\nappendfilename\r\n${len(appendfile.encode())}\r\n'.encode()+appendfile.encode()+b'\r\n'
     elif data_list[2].lower() == 'appendfsync':
         append_sync=RedisAsyncServer.appendfsync
-        response=f'*2\r\n$11\r\nappendfsync\r\n${len(append_sync)}\r\n{append_sync}\r\n'
+        response=f'*2\r\n$11\r\nappendfsync\r\n${len(append_sync.encode())}\r\n'.encode()+append_sync.encode()+b'\r\n'
     return response
 
 # KEYS
@@ -257,9 +256,10 @@ def get_keys(data_list,data_store):
         data_store=datastore_cleanup(data_store)
         all_keys=data_store.keys()
         if data_list[1] == '*':        
-            response=f'*{len(all_keys)}\r\n'    
+            response=f'*{len(all_keys)}\r\n'.encode()    
             for k in all_keys:
-                response=response+f'${len(k)}\r\n{k}\r\n'
+                k_bytes=k.encode()
+                response=response+f'${len(k_bytes)}\r\n'.encode()+k_bytes+b'\r\n'
         else:
             pattern=data_list[1]
             k_count=0
@@ -267,11 +267,11 @@ def get_keys(data_list,data_store):
             import fnmatch
             for k in all_keys:
                 if fnmatch.fnmatch(k, pattern):
-                    response=response+f'${len(k)}\r\n{k}\r\n'
+                    response=response+f'${len(k.encode())}\r\n'.encode()+k.encode()+b'\r\n'
                     k_count+=1
-            response=f'*{k_count}\r\n'+response
+            response=f'*{k_count}\r\n'.encode()+response
     except Exception as e:
-        response=f"-ERR : Getting key(s)  failed , {str(e)}\r\n" 
+        response=f"-ERR : Getting key(s)  failed , {str(e)}\r\n".encode() 
     
     return response
 

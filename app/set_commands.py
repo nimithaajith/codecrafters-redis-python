@@ -5,12 +5,11 @@ import time
 
 # subscribe to channel
 def subscribe(data_list,writer,client_address,channel_subscriptions):
-    print('inside subscribe, datalist = ',data_list)
+    
     if client_address not in channel_subscriptions:
         channel_subscriptions[client_address]=[]
         channel_subscriptions[client_address].append(set())
         channel_subscriptions[client_address].append(writer)
-    print('inside subscribe, channel name = ',data_list[1])    
     channel_subscriptions[client_address][0].add(data_list[1])        
     return channel_subscriptions
 
@@ -111,9 +110,10 @@ async def xadd(data_list,data_store):
             i += 2
         new_stream_entry.add_entry(l)                    
     
-        redis_obj.data.append(new_stream_entry)       
-        response=f'${len(stream_key)}\r\n{stream_key}\r\n'  
+        redis_obj.data.append(new_stream_entry)
+        stream_key_bytes=str(stream_key).encode()       
+        response=f'${len(stream_key_bytes)}\r\n'.encode() + stream_key_bytes + b'\r\n'  
     else:
-        response = message
+        response = message.encode()
     return data_store,response,AddStream
         

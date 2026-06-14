@@ -5,6 +5,14 @@ from . import datastore
 from datetime import datetime,timedelta,timezone
 from collections import deque
 import logging
+###############GENERAL###############################
+# bytes-based (binary-safe) encoding for response
+def utf8_encode(text:str)-> bytes:    
+    return text.encode("utf-8")
+
+def utf8_len(text:str)-> int:
+    return len(text.encode("utf-8"))
+
 ###################SERVER START UP################################ 
 def aof_replay_file(data_store,aof_path,line) :  
     try:  
@@ -126,7 +134,7 @@ def setup_server(sys_args,port_number):
                     logging.info(f'AOF file check by master......')
                 manifest_file_path=os.path.join(aof_dir,manifest_file)
                 with open(manifest_file_path,'a') as mf:
-                    print(f'manifest file check by master')
+                    logging.info(f'manifest file check by master')
                     data_str=f'file {new_aof_file} seq 1 type i'
                     mf.write(data_str)
             except Exception as e:
@@ -144,22 +152,17 @@ def setup_server(sys_args,port_number):
                 raise Exception("Runtime error during database initialization , %s",str(e))
     if RedisAsyncServer.role == 'master':
         if RedisAsyncServer.appendonly == 'yes':
-            print(">>>>>>>>AOF FILE REPLAY<<<<<<<<")
+            logging.info(">>>>>>>>AOF FILE REPLAY<<<<<<<<")
             try:
                 aof_path=os.path.join(RedisAsyncServer.dir,RedisAsyncServer.appenddirname)
-                print('aof_path =',aof_path)
                 if os.path.exists(aof_path) :
                     manifest_file=os.path.join(aof_path,RedisAsyncServer.appendfilename+'.manifest')
-                    print("manifest_file = ",manifest_file)
                     if os.path.exists(manifest_file):
-                        print("Opening manifest file")
                         with open(manifest_file,'r') as mf:
                             contents=mf.readlines()  
-                            print("Contents of manifest file ::",contents)
                             for line in contents:
-                                print("line in aof file =",line)
                                 if 'type i' in line:
-                                    print("Calling aof reply......")
+                                    logging.info("Calling aof reply......")
                                     RedisAsyncServer.data_store=aof_replay_file(RedisAsyncServer.data_store,aof_path,line) 
                                     break 
             except Exception as e:
@@ -176,14 +179,14 @@ def add_command(query_string,RedisAsyncServer) :
         data_str=None
         with open(manifest_file_path,'r') as mf:
             data_str= mf.readline()
-            print("manifest file read =",data_str)
+            
         if data_str is not None:
             aof_file_name=data_str.split()[1]
             aof_file_path=os.path.join(aof_dir,aof_file_name)
             with open(aof_file_path,'a') as af:
                 data_cmd=f'{query_string}'
                 af.write(data_cmd)    
-                print("Added SET to aoffile = ",data_cmd)   
+                  
     except Exception as e:
         logging.exception('Appending command to  AOF by master failed, %s',str(e))   
         raise Exception("Runtime error during AOF append  by master , %s",str(e))            
@@ -240,8 +243,7 @@ def get_last_stream_key(millisecondstime,stream_obj_list):
                 last_sn=sn
     if millisecondstime == 0 and last_sn == -1:
         last_sn = 0
-    print(">>>Last sequence no: ",last_sn)
-
+    
     return str(millisecondstime)+'-'+str(last_sn+1)
 
 
@@ -255,8 +257,7 @@ def get_next_stream_key(millisecondstime,stream_obj_list):
                 last_sn=sn
     if millisecondstime == 0 and last_sn == -1:
         last_sn = 0
-    print(">>>Last sequence no: ",last_sn)
-
+    
     return str(millisecondstime)+'-'+str(last_sn+1)  
 
 
@@ -282,15 +283,12 @@ def get_xrange_response(redis_obj,start,end):
         #end set to last
         
     starting_mst,starting_sn =get_mst_and_sn(start)
-    print("START>>>",starting_mst,"   ",starting_sn)
     ending_mst,ending_sn=get_mst_and_sn(end)
-    print("END>>>",ending_mst,"   ",ending_sn)    
-    print('get mst sn completed>>>>>>>')
+    
     for stream_obj in redis_obj.data:
         l=0
         mst,sn =get_mst_and_sn(stream_obj.id) 
-        print('CHECKING ID>>>>>>>',stream_obj.id)   
-        print(mst,"   ",sn)              
+                    
         if starting_mst is not None and starting_sn is not None and ending_mst is not None and ending_sn is not None :
             #'all key parts exists!!!!  
             if mst >= starting_mst and mst <= ending_mst and sn >= starting_sn and sn<= ending_sn:
@@ -300,19 +298,13 @@ def get_xrange_response(redis_obj,start,end):
             #!!!!no sequence number'
             if all(( mst >= starting_mst, mst <= ending_mst)):
                 l=len(stream_obj.entry)
-                result.append((l,stream_obj))
-        
-    n1 = len(result)
-    print("result length =",n1)   
-
+                result.append((l,stream_obj))        
+    n1 = len(result) 
     result_str=f'*{n1}\r\n'  
-    for length,obj in result:
-        print(">>>length,obj =",length,obj)
+    for length,obj in result:        
         result_str=result_str+f'*2\r\n${len(obj.id)}\r\n{obj.id}\r\n*{length*2}\r\n' 
-        for k,v in obj.entry.items():
-            print(">>>>>>k,v =",k,v)
-            result_str=result_str+f'${len(k)}\r\n{k}\r\n${len(v)}\r\n{v}\r\n'
-    print('XRANGE COMPLETED>>>>>>>')
+        for k,v in obj.entry.items():            
+            result_str=result_str+f'${len(k)}\r\n{k}\r\n${len(v)}\r\n{v}\r\n'    
     return result_str   
 
 
@@ -349,7 +341,6 @@ async def get_new_stream_key(stream_key_part1,redis_obj):
         
     else:
         stream_key = get_next_stream_key(stream_key_millisecondsTime,redis_obj.data)       
-    print(">>>New stream key: ",stream_key)
     return stream_key
 
 def get_xread_response(key,redis_obj,start):
@@ -358,12 +349,11 @@ def get_xread_response(key,redis_obj,start):
     for stream_obj in redis_obj.data:
         l=0
         if stream_obj.id > start:
-                l=len(stream_obj.entry)
-                result.append((l,stream_obj))  
-        
+            l=len(stream_obj.entry)
+            result.append((l,stream_obj))  
+    
     n1 = len(result)
-    print("xread result length =",n1)   
-
+    
     result_str=f'*2\r\n${len(key)}\r\n{key}\r\n*{n1}\r\n'  
     for length,obj in result:
         #appending each entry object of the stream and number of key-value pairs
@@ -371,7 +361,6 @@ def get_xread_response(key,redis_obj,start):
         for k,v in obj.entry.items():
             # appending key-value pairs of the stream entry
             result_str=result_str+f'${len(k)}\r\n{k}\r\n${len(v)}\r\n{v}\r\n'
-    print("RESULT = ",result_str)
     return result_str,n1
 
 

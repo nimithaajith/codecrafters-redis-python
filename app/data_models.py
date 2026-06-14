@@ -1,4 +1,4 @@
-from collections import deque
+from collections import deque,defaultdict
 import asyncio
 
 class Transaction():
@@ -21,12 +21,15 @@ class RedisServer():
         self.data_store={}
         # self.server=Master()
         self.clients=[]
+        self.channel_subscriptions={}
+        self.xread_stream_block_que=defaultdict(list)
+        self.transaction_lock=Transaction()
 
 class Replica(RedisServer):
     def __init__(self):
         super().__init__(role='slave' )
         self.replica_command_offset=0
-        print('replica offset initialized to 0')
+        
         
 class Master(RedisServer):
     def __init__(self):
@@ -40,10 +43,12 @@ class Master(RedisServer):
         self.appendfsync='everysec'
         self.master_replid = ''
         self.master_repl_offset=None
+
         
         # dict of Lists,key is slave-writer,value is list(replica's offset,sync)
         # sync is true means replica's offset and  replica server's replica_command_offset are same
         self.ReplicaList={}
+        self.CommandDeque=deque()
 
     def get_type(self,value):
         if value == 0:
@@ -86,10 +91,7 @@ class StreamEntry():
         self.id = id
         self.entry={} 
     def add_entry(self,data_list) :
-        print("******Add entry called*******")
+        
         for item in data_list:
             self.entry[item[0]] = item[1] 
-            print("stream entry added key-val as :",item[0],item[1])
-            print("stream entry dict")  
-            print(self.entry)
-        print("******Add entry finished*******")
+            
