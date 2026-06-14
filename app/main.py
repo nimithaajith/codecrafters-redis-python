@@ -229,7 +229,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
     logging.info(f"command_handler->command = {query_string}")
     modified_key=[]    
     if data_list[0].upper() == 'PING':
-        response=f"+PONG\r\n"     
+        response=f"+PONG\r\n".encode()     
     elif data_list[0].upper() == 'ECHO':
         if len(data_list[1:] ) > 1:
             echo_data=" ".join(data_list[1:])
