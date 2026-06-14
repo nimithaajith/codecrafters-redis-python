@@ -91,9 +91,15 @@ def geo_position(data_list,data_store):
                         latitude,longitude=geo_decode.decode(int(score))
                         la=str(latitude)
                         lo=str(longitude)
-                        la_bytes=la.encode()
-                        lo_bytes=lo.encode()
-                        response=response + f'*2\r\n${len(lo_bytes)}\r\n'.encode() + lo_bytes+b'\r\n' + f'${len(la_bytes)}\r\n'.encode() + la_bytes + b'\r\n'
+                        la_bytes=la.encode('utf-8')
+                        lo_bytes=lo.encode('utf-8')
+                        # response=response + f'*2\r\n${len(lo_bytes)}\r\n'.encode() + lo_bytes+b'\r\n' + f'${len(la_bytes)}\r\n'.encode() + la_bytes + b'\r\n'
+                        response =response+ (
+                            b'*2\r\n' +
+                            f'${len(lo_bytes)}\r\n'.encode('ascii') + lo_bytes + b'\r\n' +
+                            f'${len(la_bytes)}\r\n'.encode('ascii') + la_bytes + b'\r\n'
+                        )
+
                         is_member=True
                         break
                 if not is_member:
