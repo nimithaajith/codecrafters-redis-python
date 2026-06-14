@@ -558,7 +558,7 @@ async def command_handler(writer,client_addr,server_role,query_string,data_list)
                                 for i in range(pop_count):
                                     popped_elements.append(redis_obj.data.pop(0))
                                 length=len(popped_elements)                        
-                                response=f'*{length}\r\n'.encode()+''.join([f'${len(ele.encode())}\r\n'.encode()+ele.encode()+b'\r\n' for ele in popped_elements]) 
+                                response=f'*{length}\r\n'.encode()+b''.join([f'${len(ele.encode())}\r\n'.encode()+ele.encode()+b'\r\n' for ele in popped_elements]) 
                                                                                           
                     else:
                         response=f'-ERR WRONGTYPE Operation against a key, {key} does not hold a list.'.encode()         
