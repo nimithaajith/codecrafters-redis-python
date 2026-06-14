@@ -1083,11 +1083,15 @@ async def client_handler(reader,writer):
                             
                         else:
                             response =f'*{que_length}\r\n'.encode()
+                            print("======EXEC RESPONSE======")
                             while len(MULTI[1]) > 0 :                                                            
                                 query_string,input_tokens_list=MULTI[1].popleft()                                
                                 if input_tokens_list:
                                     cmd_response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,input_tokens_list)
+                                    print(cmd_response)
                                     response = response+ f'{cmd_response}'
+                            
+                            print(response)
                             writer.write(response)
                             await writer.drain() 
                             MULTI[0]=False
