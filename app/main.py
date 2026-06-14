@@ -1082,13 +1082,13 @@ async def client_handler(reader,writer):
                             await writer.drain() 
                             
                         else:
-                            response =f'*{que_length}\r\n'
+                            response =f'*{que_length}\r\n'.encode()
                             while len(MULTI[1]) > 0 :                                                            
                                 query_string,input_tokens_list=MULTI[1].popleft()                                
                                 if input_tokens_list:
                                     cmd_response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,input_tokens_list)
                                     response = response+ f'{cmd_response}'
-                            writer.write(response.encode())
+                            writer.write(response)
                             await writer.drain() 
                             MULTI[0]=False
                     RedisAsyncServer.transaction_lock.locks[client_addr].clear()        
