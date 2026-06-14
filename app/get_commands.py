@@ -105,7 +105,7 @@ def geo_position(data_list,data_store):
                 if not is_member:
                     response=response + b'*-1\r\n'
         else:
-            response=response + ''.join(b'*-1\r\n' for _ in range(m_len))
+            response=response + b''.join(b'*-1\r\n' for _ in range(m_len))
     except RuntimeError as e:
         response=f"-ERR : GEO POSITION failed ,{str(e)}.\r\n".encode()  
     except Exception as e:
