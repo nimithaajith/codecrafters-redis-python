@@ -29,8 +29,9 @@ def geo_search(data_list,data_store):
                     locations.append(place)
             if locations :
                 print(locations)
-                response=f'*{len(locations)}\r\n'.encode()+''.join([f'${len(l.encode())}\r\n'.encode()+l.encode()+b'\r\n' for l in locations])
+                response=f'*{len(locations)}\r\n'+''.join([f'${len(l)}\r\n{l}\r\n' for l in locations])
                 print(response)
+                response=response.encode()
             else:
                 response=b'*0\r\n'
         else:
