@@ -1161,6 +1161,8 @@ async def client_handler(reader,writer):
                         continue           
             try:
                 response = await command_handler(writer,client_addr,RedisAsyncServer.role,query_string,data_list)
+                print("======command_handler RESPONSE final======")
+                print(response)
             except Exception as e:
                 logging.exception("Exception during client command handling, %s",str(e))
                 response = f"-ERR runtime error, {str(e)}\r\n".encode()
