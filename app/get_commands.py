@@ -28,7 +28,7 @@ def geo_search(data_list,data_store):
                 if (dist * conv) <= radius :
                     locations.append(place)
             if locations :
-                response=f'*{len(locations)}\r\n'+''.join(f'${len(l.encode())}\r\n'.encode()+l.encode()+b'\r\n' for l in locations)
+                response=f'*{len(locations)}\r\n'.encode()+''.join(f'${len(l.encode())}\r\n'.encode()+l.encode()+b'\r\n' for l in locations)
             else:
                 response=b'*0\r\n'
         else:
@@ -62,7 +62,7 @@ def geo_dist(data_list,data_store):
                 if  latitude1 and longitude1 and latitude2 and longitude2 :
                     dist=  distance.haversine(latitude1, longitude1, latitude2, longitude2) 
                     
-                    response=f'${len(str(dist))}\r\n{str(dist)}\r\n'
+                    response=f'${len(str(dist))}\r\n{str(dist)}\r\n'.encode()
                     break  
         else:
             response = b'$-1\r\n'
