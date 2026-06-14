@@ -93,7 +93,7 @@ def geo_position(data_list,data_store):
                         lo=str(longitude)
                         la_bytes=la.encode()
                         lo_bytes=lo.encode()
-                        response=response + f'*2\r\n${len(lo_bytes)}\r\n'.encode() + lo_bytes + f'\r\n${len(la_bytes)}\r\n'.encode() + la_bytes + b'\r\n'
+                        response=response + f'*2\r\n${len(lo_bytes)}\r\n'.encode() + lo_bytes+b'\r\n' + f'${len(la_bytes)}\r\n'.encode() + la_bytes + b'\r\n'
                         is_member=True
                         break
                 if not is_member:
