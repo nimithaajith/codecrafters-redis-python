@@ -21,14 +21,16 @@ def geo_search(data_list,data_store):
                 conv=0.001
             elif unit == 'mi' :
                 conv =0.00062137
-
+            print("====geo search====")
             for score,place in geopos:
                 lat,long=geo_decode.decode(int(score))
                 dist=  distance.haversine( lat, long,center_lat, center_long)
                 if (dist * conv) <= radius :
                     locations.append(place)
             if locations :
+                print(locations)
                 response=f'*{len(locations)}\r\n'.encode()+''.join(f'${len(l.encode())}\r\n'.encode()+l.encode()+b'\r\n' for l in locations)
+                print(response)
             else:
                 response=b'*0\r\n'
         else:
