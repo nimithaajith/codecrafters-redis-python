@@ -106,7 +106,7 @@ async def xread_stream_block_handler(key,stream_key,expires_on,client_addr):
         try:
             if datetime.now(timezone.utc) >= expires_on :
                 RedisAsyncServer.xread_stream_block_que[key].remove(client_addr)
-                return  b'*-1\r\n',True
+                return  f'*-1\r\n',True
             else:
                 client_details_list=RedisAsyncServer.xread_stream_block_que[key]
                 if client_addr in client_details_list:
