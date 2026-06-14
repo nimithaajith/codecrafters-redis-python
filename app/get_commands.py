@@ -34,9 +34,9 @@ def geo_search(data_list,data_store):
         else:
             response=b'*0\r\n'
     except RuntimeError as e:
-        response=f"-ERR : GEO SEARCH failed ,{str(e)}.\r\n".encode() 
+        response=f"-ERR : GEO SEARCH failed ,{str(e)}.".encode() 
     except Exception as e:
-        response=f"-ERR : GEO SEARCH failed , {str(e)}\r\n".encode() 
+        response=f"-ERR : GEO SEARCH failed , {str(e)}".encode() 
     return response
 
 # GEODIST places Munich Paris  
@@ -61,8 +61,8 @@ def geo_dist(data_list,data_store):
                         latitude2,longitude2=geo_decode.decode(int(score))            
                 if  latitude1 and longitude1 and latitude2 and longitude2 :
                     dist=  distance.haversine(latitude1, longitude1, latitude2, longitude2) 
-                    dist_bytes=str(dist).encode() 
-                    response=f'${len(dist_bytes)}\r\n'.encode() + dist_bytes + b'\r\n'
+                    
+                    response=f'${len(str(dist))}\r\n{str(dist)}\r\n'
                     break  
         else:
             response = b'$-1\r\n'
